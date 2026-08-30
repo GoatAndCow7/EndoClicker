@@ -1,0 +1,17 @@
+# Dépendances
+node_modules/
+
+# Build
+client/dist/
+
+# Base SQLite locale (tests)
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Environnement
+.env
+
+# Divers
+.DS_Store

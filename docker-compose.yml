@@ -1,0 +1,28 @@
+# EndoClicker — Docker Compose (Dokploy)
+# Variables (Dokploy → onglet Environment) :
+#   JWT_SECRET     (obligatoire) — ex : openssl rand -hex 32
+#   ADMIN_PASSWORD (optionnel)   — mot de passe initial du compte admin
+#                                  « GoatAndCow » s'il n'existe pas encore.
+#                                  Sinon il est généré et affiché dans les logs.
+# Le volume endoclicker_data conserve comptes + progressions + classement.
+
+services:
+  endoclicker:
+    build: .
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_PSEUDO: ${ADMIN_PSEUDO:-GoatAndCow}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      PORT: "3000"
+      DATA_DIR: /app/data
+    # 8090 = port PUBLIC sur le serveur (3000 est pris par le dashboard Dokploy)
+    # → accès direct : http://IP-DU-SERVEUR:8090
+    # → avec un domaine Dokploy : cibler le port 3000 (interne du conteneur)
+    ports:
+      - '8090:3000'
+    volumes:
+      - endoclicker_data:/app/data
+
+volumes:
+  endoclicker_data:
