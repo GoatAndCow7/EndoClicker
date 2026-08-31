@@ -44,6 +44,23 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_states_total ON states(total_endocraft DESC);
+
+  -- Avertissements anti-triche : 2 sauvegardes impossibles dans l'heure
+  -- = sanction (remise à zéro + bannissement IP 24 h).
+  CREATE TABLE IF NOT EXISTS anti_cheat (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    strikes INTEGER NOT NULL DEFAULT 0,
+    last_strike_at INTEGER NOT NULL DEFAULT 0
+  );
+
+  -- Bannissements IP temporaires (sanction automatique anti-triche)
+  CREATE TABLE IF NOT EXISTS ip_bans (
+    ip TEXT PRIMARY KEY,
+    user_id INTEGER,
+    reason TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    until INTEGER NOT NULL
+  );
 `);
 
 // Migration : bases créées avant l'ajout de colonnes
@@ -64,8 +81,10 @@ db.exec(`
   }
 }
 
-// --- Reset mondial ---
-// Incrémentée à chaque grande refonte d'équilibrage. Au démarrage, si la
+// Bannissements IP expirés : purgés au démarrage, la table reste minuscule.
+db.prepare('DELETE FROM ip_bans WHERE until < ?').run(now());
+
+// --- Reset mondial ---// Incrémentée à chaque grande refonte d'équilibrage. Au démarrage, si la
 // base est plus ancienne, toute la progression est effacée (les comptes
 // sont conservés) : tout le monde repart sur une base propre et équitable.
 const WORLD_VERSION = 2;

@@ -609,26 +609,48 @@ function UserEditor({ userId, onClose, onSaved }) {
 
 // ============ Panneau principal ============
 
+// Raison anti-triche brute → explication courte
+const CHEAT_REASONS = {
+  inventaire: 'inventaire non payable',
+  solde: 'solde impossible',
+  gains: 'gains impossibles dans le temps de jeu',
+  'gains-à-vie': 'total à vie impossible',
+  renaissances: 'renaissances impossibles',
+  'succès': 'succès forgés',
+  taux: 'taux déclaré gonflé',
+  clics: 'clics impossibles',
+  compteurs: 'compteurs impossibles',
+  valeurs: 'valeurs invalides',
+};
+
 export default function AdminPanel() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState(null);
+  const [bans, setBans] = useState([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState(null);
 
   const refresh = async (q = search) => {
     try {
-      const [s, u] = await Promise.all([
+      const [s, u, b] = await Promise.all([
         api('/api/admin/stats'),
         api(`/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+        api('/api/admin/bans'),
       ]);
       setStats(s);
       setUsers(u.users);
+      setBans(b.bans);
       setError(null);
     } catch (e) {
       setError(e.message);
     }
   };
+
+  const liftBan = (ip) =>
+    api(`/api/admin/bans/${encodeURIComponent(ip)}/lift`, { method: 'POST' })
+      .then(() => refresh())
+      .catch((e) => setError(e.message));
 
   useEffect(() => {
     refresh();
@@ -663,6 +685,42 @@ export default function AdminPanel() {
             <p className="stat-tile-value truncate">
               {stats.top[0] ? `🥇 ${stats.top[0].pseudo}` : '—'}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Bannissements IP (sanctions anti-triche automatiques) */}
+      {bans.length > 0 && (
+        <div className="panel-flat rounded-xl p-3">
+          <h4 className="section-title mb-2">
+            🚫 Bannissements IP actifs ({bans.length})
+          </h4>
+          <div className="space-y-1.5">
+            {bans.map((b) => (
+              <div key={b.ip} className="list-row p-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-ink">
+                    {b.pseudo || '?'}{' '}
+                    <span className="font-normal text-ink-3">• {b.ip}</span>
+                  </p>
+                  <p className="truncate text-2xs tabular-nums text-ink-4">
+                    {CHEAT_REASONS[b.reason] || b.reason} — lever à{' '}
+                    {new Date(b.until).toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}
+                    ({Math.max(1, Math.ceil((b.until - Date.now()) / 3600_000))} h)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => liftBan(b.ip)}
+                  className="btn-ghost focus-ring h-9 shrink-0 text-2xs"
+                >
+                  Lever
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}

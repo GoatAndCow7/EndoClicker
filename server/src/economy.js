@@ -23,7 +23,6 @@ import {
   COST_FACTOR,
   CLICK_PRODUCTION_SHARE,
   getRenaissanceMult,
-  getRenaissanceThreshold,
 } from '../../client/src/game/constants.js';
 
 // Marges : toujours généreuses pour un joueur honnête, mortelles pour
@@ -38,8 +37,6 @@ const CLICK_RATE_CAP = 30;
 const RATE_FACTOR = 8;
 // Remises ZoxXio non modélisées + arrondis sur les grosses sommes.
 const INV_SLACK = 1.2;
-// Cumul des seuils de Renaissance vs total à vie.
-const REN_SLACK = 1.2;
 // Démarrage, quêtes, cadeaux admin : une petite marge fixe.
 const BASE_ALLOWANCE = 2e9;
 const INV_ALLOWANCE = 1e7;
@@ -141,16 +138,82 @@ function braisesTotal(renaissances) {
   return (n * (n + 1)) / 2 * 5e8;
 }
 
-// EndoCraft total qu'il faut avoir farmé pour enchaîner n renaissances
-// (500 B, puis ×3 à chaque fois). Croît de façon explosive : aucune
-// boucle de renaissances forgée ne peut passer.
-function renaissancesFloor(renaissances) {
-  let sum = 0;
-  for (let k = 0; k < Math.floor(num(renaissances)); k++) {
-    sum += getRenaissanceThreshold(k);
-    if (!Number.isFinite(sum)) return Infinity;
+// EndoCraft nécessaire pour boucler n renaissances : dominé par le
+// dernier seuil (500 B × 3^(n-1)). Les seuils croissent de façon
+// explosive — on compare en logarithmes pour ne jamais déborder,
+// même à des renaissances stratosphériques (atteignables honnêtement
+// en fin de partie, où les cycles s'accélèrent).
+const LN_REN_BASE = Math.log(5e11);
+const LN_REN_GROWTH = Math.log(3);
+function lnRenaissanceCost(renaissances) {
+  return LN_REN_BASE + Math.max(0, renaissances - 1) * LN_REN_GROWTH;
+}
+
+// Succès contredits par leurs compteurs. Les compteurs à vie sont
+// monotones (jamais remis à zéro, même à la Renaissance) : un succès
+// possédé dont le compteur est en dessous du requis est une liste
+// forgée — genre « tous les succès » en 12 minutes de jeu.
+const ACHIEVEMENT_FLOORS = {
+  'click-1': [['clicks', 1]],
+  'click-100': [['clicks', 100]],
+  'click-1000': [['clicks', 1000]],
+  'click-10000': [['clicks', 10000]],
+  'time-1h': [['playMs', 3_600_000]],
+  'time-10h': [['playMs', 36_000_000]],
+  'total-100': [['lifetimeEndocraft', 100]],
+  'total-10k': [['lifetimeEndocraft', 1e4]],
+  'total-1m': [['lifetimeEndocraft', 1e6]],
+  'total-100m': [['lifetimeEndocraft', 1e8]],
+  'total-10b': [['lifetimeEndocraft', 1e10]],
+  'total-1t': [['lifetimeEndocraft', 1e12]],
+  'total-1qa': [['lifetimeEndocraft', 1e15]],
+  'apple-1': [['applesClicked', 1]],
+  'apple-10': [['applesClicked', 10]],
+  'apple-25': [['applesClicked', 25]],
+  'cristal-10': [['applesByType.cristal', 10]],
+  'maudite-10': [['applesByType.maudite', 10]],
+  'degustateur': [
+    ['applesByType.doree', 1], ['applesByType.orage', 1],
+    ['applesByType.ombre', 1], ['applesByType.cristal', 1],
+    ['applesByType.maudite', 1],
+  ],
+  'boucherie-50': [['shadowMinisCaught', 50]],
+  'rain-1': [['applesRained', 1]],
+  'rain-20': [['applesRained', 20]],
+  'quest-1': [['questsClaimed', 1]],
+  'quest-50': [['questsClaimed', 50]],
+  'case-1': [['casesOpened', 1]],
+  'case-25': [['casesOpened', 25]],
+  'case-legend': [['caseLegendaryDrops', 1]],
+  'curieux': [['titleClicks', 25]],
+  'renaissance-1': [['renaissances', 1]],
+  'renaissance-5': [['renaissances', 5]],
+  'renaissance-10': [['renaissances', 10]],
+  'cosmetic-1': [['cosmeticsCount', 1]],
+  'cosmetic-all': [['cosmeticsCount', 3]],
+};
+
+function statValue(state, key) {
+  if (key === 'cosmeticsCount') {
+    return (Array.isArray(state.cosmetics) ? state.cosmetics : [])
+      .filter((c) => c !== 'default').length;
   }
-  return sum;
+  if (key.startsWith('applesByType.')) {
+    return num((state.applesByType || {})[key.slice(13)]);
+  }
+  return num(state[key]);
+}
+
+function contradictedAchievements(state) {
+  const owned = Array.isArray(state.achievements) ? state.achievements : [];
+  let contradicted = 0;
+  for (const id of owned) {
+    const floors = ACHIEVEMENT_FLOORS[id];
+    if (floors && floors.some(([key, min]) => statValue(state, key) < min)) {
+      contradicted++;
+    }
+  }
+  return contradicted;
 }
 
 // Vérifie qu'un état est économiquement possible.
@@ -219,10 +282,18 @@ export function verifyEconomy(state, ctx = {}) {
     return reject('gains-à-vie');
   }
 
-  // 4. Renaissance : les seuils cumulés doivent rentrer dans le total
-  //    à vie, et l'ancre de la dernière renaissance reste cohérente.
-  if (renaissancesFloor(renaissances) > lifetime * REN_SLACK + 1e9) {
-    return reject('renaissances');
+  // 4. Renaissance : le coût des seuils (comparé en log) doit tenir
+  //    dans le total à vie ET dans l'ancre de la dernière renaissance —
+  //    sinon un « Plein rebirth » forgé passe en déclarant une ancre
+  //    élevée. Tolérance ×2 : un honnête cumule ~1,5 × le dernier seuil.
+  if (renaissances >= 1) {
+    const lnCost = lnRenaissanceCost(renaissances);
+    if (lnCost > Math.log(Math.max(lifetime, 1e9)) + Math.log(2)) {
+      return reject('renaissances');
+    }
+    if (lnCost > Math.log(Math.max(lastRen, 1e9)) + Math.log(2)) {
+      return reject('renaissances');
+    }
   }
   if (lastRen > lifetime + 1e9) {
     return reject('renaissances');
@@ -233,11 +304,19 @@ export function verifyEconomy(state, ctx = {}) {
     return reject('taux');
   }
 
-  // 6. Compteurs bornés par le temps réel et le catalogue.
+  // 6. Succès : posséder un succès dont le compteur à vie est sous le
+  //    requis est impossible. Une liste débloquée d'un coup en cumule
+  //    des dizaines de contradictions ; une seule est tolérée (marge
+  //    pour un futur rééquilibrage d'un seuil).
+  if (contradictedAchievements(state) >= 2) {
+    return reject('succès');
+  }
+
+  // 7. Compteurs bornés par le temps réel et le catalogue.
   if (clicks > windowSec * CLICK_RATE_CAP + 1000) {
     return reject('clics');
   }
-  if (renaissances > 1000 || (state.staff || []).length > STAFF.length) {
+  if (renaissances > 10_000 || (state.staff || []).length > STAFF.length) {
     return reject('compteurs');
   }
   if ((state.achievements || []).length > ACHIEVEMENTS.length) {

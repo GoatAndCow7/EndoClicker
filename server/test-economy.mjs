@@ -1,5 +1,6 @@
 // Tests des invariantes économiques (lancé depuis server/)
 import { verifyEconomy, inventorySpent, theoreticalProduction } from './src/economy.js';
+import { ACHIEVEMENTS } from '../client/src/game/constants.js';
 
 const HOUR = 3600_000;
 let pass = 0, fail = 0;
@@ -105,6 +106,60 @@ const reset = {
 };
 r = verifyEconomy(reset, { accountAgeMs: 8 * 24 * HOUR, declaredRate: 500 });
 check('joueur juste après renaissance accepté', r.ok);
+
+// --- 13. « Renaissance 600 » : boucle de renaissances forgée ---
+// Version fainéante (ancre et total à vie dérisoires)…
+const r600 = {
+  endocraft: 1, totalEndocraft: 1e20, lifetimeEndocraft: 1e15, lastRenaissanceLifetime: 0,
+  clicks: 100, playMs: HOUR, renaissances: 600,
+  generators: { coeur: 50 }, upgrades: [], staff: [], cosmetics: [],
+};
+r = verifyEconomy(r600, { accountAgeMs: 24 * HOUR });
+check('Renaissance 600 (lifetime bas) refusée (raison=' + r.reason + ')', !r.ok);
+// …et version « soignée » : tout est gonflé pour sembler cohérent.
+const r600b = { ...r600, lifetimeEndocraft: 1e297, lastRenaissanceLifetime: 1e297 };
+r = verifyEconomy(r600b, { accountAgeMs: 24 * HOUR });
+check('Renaissance 600 (lifetime gonflé à 1e297) refusée (raison=' + r.reason + ')', !r.ok);
+// La courbe de coûts (×1,15 par achat) et les resets de banque à chaque
+// Renaissance plafonnent l'économie : aucun état R600 ne se tient, même
+// gonflé partout. Un joueur qui monte haut honnêtement reste accepté —
+// construit par construction : gains = taux × temps réel.
+const r8 = {
+  endocraft: 1e14, totalEndocraft: 1e15, renaissances: 8,
+  lifetimeEndocraft: 2.2e15, lastRenaissanceLifetime: 1.2e15,
+  clicks: 40_000, playMs: 100 * HOUR,
+  generators: { dragon: 10, shulker: 5, wither: 2, end: 20, deepdark: 30 },
+  upgrades: ['pick-bois','pick-pierre','pick-fer','gen-dragon-10'],
+  staff: [], cosmetics: [], achievements: ['click-1','total-1t'],
+};
+const rate8 = theoreticalProduction(r8);
+r = verifyEconomy(r8, { accountAgeMs: 60 * 24 * HOUR, declaredRate: rate8 });
+check('Renaissance 8 honnête (semaines de jeu) acceptée (taux ' + rate8.toExponential(2) + ')', r.ok);
+
+// --- 14. « Tous les succès » en 12 minutes de jeu ---
+const allAch = {
+  endocraft: 100, totalEndocraft: 500, lifetimeEndocraft: 500,
+  clicks: 50, playMs: 12 * 60_000, renaissances: 0, lastRenaissanceLifetime: 0,
+  generators: {}, upgrades: [], staff: [], cosmetics: [],
+  achievements: ACHIEVEMENTS.map((a) => a.id),
+};
+r = verifyEconomy(allAch, { accountAgeMs: HOUR });
+check('tous les succès refusés (raison=' + r.reason + ')', !r.ok);
+// Un vrai collectionneur (compteurs à la hauteur, gains plausibles) passe.
+const collector = {
+  endocraft: 1e12, totalEndocraft: 5e15, lifetimeEndocraft: 1.8e17,
+  clicks: 12_000, playMs: 50 * HOUR, renaissances: 12,
+  lastRenaissanceLifetime: 1.75e17,
+  generators: { dragon: 15, end: 30, deepdark: 30, nether: 40 },
+  upgrades: ['pick-bois','pick-pierre','pick-fer'], staff: [],
+  cosmetics: ['endosage', 'endoblaze', 'endoroi'],
+  achievements: ACHIEVEMENTS.map((a) => a.id),
+  applesClicked: 30, applesByType: { doree: 10, orage: 5, ombre: 5, cristal: 12, maudite: 11 },
+  shadowMinisCaught: 60, applesRained: 25, questsClaimed: 55,
+  casesOpened: 30, caseLegendaryDrops: 2, titleClicks: 30,
+};
+r = verifyEconomy(collector, { accountAgeMs: 90 * 24 * HOUR, declaredRate: theoreticalProduction(collector) });
+check('collectionneur honnête accepté', r.ok);
 
 console.log(`\n${pass} ok, ${fail} échec(s)`);
 process.exit(fail ? 1 : 0);

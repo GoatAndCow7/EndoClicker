@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db, now } from './db.js';
 import { requireAuth } from './middleware/auth.js';
 import { verifyEconomy } from './economy.js';
+import { recordStrike, applySanction } from './sanction.js';
 
 export const stateRouter = Router();
 
@@ -72,9 +73,21 @@ stateRouter.put('/state', requireAuth, (req, res) => {
   if (!row || !row.anti_cheat_disabled) {
     const audit = verifyEconomy(state, { accountAgeMs, declaredRate: rate });
     if (!audit.ok) {
+      // Sauvegarde impossible : avertissement. Deux dans l'heure =
+      // sanction automatique (progression effacée + IP bannie 24 h).
+      const strike = recordStrike(req.user.id, t);
+      const pseudo = db
+        .prepare('SELECT pseudo FROM users WHERE id = ?')
+        .get(req.user.id)?.pseudo;
       console.warn(
-        `[anti-triche] sauvegarde refusée pour ${req.user.id} (${audit.reason})`
+        `[anti-triche] ${pseudo} (#${req.user.id}, IP ${req.ip}) : ${audit.reason} (avertissement ${strike}/2)`
       );
+      if (strike >= 2) {
+        applySanction({ userId: req.user.id, ip: req.ip, reason: audit.reason });
+        console.warn(
+          `[anti-triche] ⚖️  ${pseudo} (#${req.user.id}) : progression remise à zéro, IP ${req.ip} bannie 24 h`
+        );
+      }
       return res.status(422).json({
         error: 'Progression implausible, sauvegarde refusée',
       });
@@ -94,6 +107,10 @@ stateRouter.put('/state', requireAuth, (req, res) => {
 
     if (!row.anti_cheat_disabled) {
       // Anti-triche « permissif » : ne doit JAMAIS bloquer un joueur honnête.
+      // Ces fenêtres ne comptent PAS d'avertissement : un très gros achat
+      // peut dépasser le plafond d'un intervalle (le taux monte d'un coup)
+      // et se débloque seul à la synchro suivante. Seules les impossibilités
+      // structurelles (verifyEconomy ci-dessus) sont sanctionnées.
       // - le taux déclaré couvre la production (y compris juste après l'achat
       //   de gros générateurs, qui fait sauter le gain légitime)
       // - + 35 % de la banque par intervalle (pluie de pommes complète,

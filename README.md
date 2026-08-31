@@ -176,6 +176,7 @@ Variables d'environnement du serveur :
 | `DATA_DIR` | `/app/data` | Emplacement de la base SQLite (en local : `server/data`) |
 | `ADMIN_PSEUDO` | `GoatAndCow` | Pseudo du compte administrateur (réservé) |
 | `ADMIN_PASSWORD` | aléatoire | Mot de passe initial du compte admin s'il n'existe pas encore |
+| `TRUST_PROXY` | `1` | Nombre de reverse-proxies devant le serveur (Dokploy = 1). Indispensable pour que les bannissements IP visent la vraie IP du joueur |
 
 Le pseudo administrateur ne peut pas être pris à l'inscription. Au premier démarrage, s'il n'existe pas, il est créé automatiquement (mot de passe depuis `ADMIN_PASSWORD`, sinon généré et affiché dans les logs). Sans `JWT_SECRET`, le serveur démarre avec un secret de dev et vous le dira bruyamment dans les logs — en production, définissez-le (`openssl rand -hex 32` fait très bien l'affaire).
 
@@ -228,19 +229,41 @@ une seule source de vérité, zéro divergence au rééquilibrage).
   production théorique de l'état × le temps réel (âge du compte, +7 j
   de farm invité possible avant inscription) × 6 (frénésies, pommes,
   caisses pour un joueur parfait 24/7), + la part des clics.
-- **Renaissances cohérentes** : le cumul des seuils (500 B × 3ⁿ) doit
-  tenir dans le total à vie — une boucle de renaissances forgée est
-  mathématiquement impossible à faire passer.
+- **Renaissances cohérentes** : le coût des seuils (500 B × 3ⁿ,
+  comparé en logarithmes) doit tenir dans le total à vie ET dans
+  l'ancre de la dernière renaissance. La courbe de coûts plafonne
+  l'économie : un « Plein rebirth » à 600 renaissances ne peut pas
+  exister, même en gonflant tous les chiffres.
+- **Succès cohérents** : les compteurs à vie sont monotones — un
+  succès possédé dont le compteur est sous le requis (10 000 clics,
+  10 h de jeu, 30 caisses…) est une liste forgée.
 - **Taux déclaré plafonné** par la capacité réelle de l'état (frénésie
   ×7 + marge) : le plafond de la fenêtre anti-triche ne peut plus être
   gonflé par une fausse déclaration.
 - **Compteurs bornés** : clics ≤ 30/s de temps de jeu, succès et staff
   ≤ catalogue, aucune valeur infinie.
 
+### Sanctions automatiques
+
+Une sauvegarde impossible vaut un **avertissement** ; deux dans
+l'heure = sanction : la **progression du compte est effacée** et
+l'**IP est bloquée 24 h** (tout l'API lui répond 403). Le tricheur
+connecté voit le reset s'appliquer instantanément (SSE) ; au retour
+du ban, son appareil récupère l'état remis à zéro même si son
+localStorage local affiche des milliards (la révision serveur gagne).
+La fenêtre d'une heure protège un accident isolé ; un tricheur, lui,
+retente en boucle : il est puni en quelques minutes. Les fenêtres de
+gain classiques (plafond par intervalle) ne comptent PAS
+d'avertissement : un très gros achat honnête peut les faire sauter
+temporairement, ça se débloque seul.
+
+Le panneau admin liste les bannissements actifs (pseudo, IP, motif,
+heure de levée) avec un bouton **Lever** en cas de faux positif.
+
 En pratique :
 
 - Sauvegarde refusée → `422`, le client rejouera sa sync plus tard
-  (aucune perte pour un joueur honnête, les marges sont large).
+  (aucune perte pour un joueur honnête, les marges sont larges).
 - Un état déjà en base qui devient impossible (sync d'avant le
   renforcement) **disparaît du classement** et son profil ressort
   non classé.

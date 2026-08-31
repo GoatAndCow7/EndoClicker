@@ -4,6 +4,7 @@ import { db, now, ADMIN_PSEUDO } from './db.js';
 import { requireAuth, isAdmin } from './middleware/auth.js';
 import { sendToUser, isOnline } from './events.js';
 import { verifyEconomy } from './economy.js';
+import { liftBan } from './sanction.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, isAdmin);
@@ -280,6 +281,24 @@ adminRouter.put('/users/:id/anticheat', (req, res) => {
     ).run(user.id, t, disabled ? 1 : 0, t);
   }
   res.json({ ok: true, antiCheatDisabled: disabled });
+});
+
+// --- Bannissements IP (sanctions anti-triche automatiques) ---
+adminRouter.get('/bans', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT b.ip, b.reason, b.created_at, b.until, u.pseudo
+       FROM ip_bans b LEFT JOIN users u ON u.id = b.user_id
+       WHERE b.until > ? ORDER BY b.until DESC`
+    )
+    .all(now());
+  res.json({ bans: rows });
+});
+
+// Lever manuellement un bannissement (faux positif, etc.)
+adminRouter.post('/bans/:ip/lift', (req, res) => {
+  liftBan(req.params.ip);
+  res.json({ ok: true });
 });
 
 // --- Effets en direct (SSE) ---
