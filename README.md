@@ -272,7 +272,9 @@ Renaissance).
 
 Une sauvegarde impossible vaut un **avertissement** ; deux dans
 l'heure = sanction : la **progression du compte est effacée** et
-l'**IP est bloquée 24 h** (tout l'API lui répond 403). Le tricheur
+l'**IP est bloquée 24 h** : plus aucun accès — ni l'API, ni le site
+lui-même (page et assets compris), remplacés par un écran « Accès
+suspendu ». Le tricheur
 connecté voit le reset s'appliquer instantanément (SSE) ; au retour
 du ban, son appareil récupère l'état remis à zéro même si son
 localStorage local affiche des milliards (la révision serveur gagne).

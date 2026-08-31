@@ -65,20 +65,47 @@ app.use((req, res, next) => {
   next();
 });
 
-// IP bannie (sanction anti-triche) : tout l'API est fermé 24 h.
-app.use('/api', (req, res, next) => {
+// IP bannie (sanction anti-triche) : PLUS AUCUN accès — ni l'API, ni le
+// site lui-même (page, assets). Une mini-page autonome l'explique.
+const BAN_PAGE = (until) => `<!doctype html>
+<html lang="fr"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accès suspendu — EndoClicker</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#14100c; color:#f3ede4; font-family:system-ui, sans-serif; }
+  .card { max-width:420px; margin:16px; padding:32px 28px; text-align:center;
+          background:#1d1712; border:1px solid #3a2c1e; border-radius:16px; }
+  h1 { margin:0 0 12px; font-size:20px; color:#f59b3d; }
+  p { margin:6px 0; font-size:14px; line-height:1.5; color:#c9bfae; }
+  .until { font-size:16px; font-weight:700; color:#f3ede4; }
+</style></head>
+<body><div class="card">
+  <h1>🚫 Accès suspendu</h1>
+  <p>Triche détectée : la progression de ce compte a été remise à zéro
+     et l'accès au site est fermé pendant 24 heures.</p>
+  <p class="until">Fin de la suspension : ${until}</p>
+  <p>Si vous pensez qu'il s'agit d'une erreur, contactez l'équipe
+     EndoCraft.</p>
+</div></body></html>`;
+
+app.use((req, res, next) => {
   const ban = getBan(normalizeIp(req.ip));
-  if (ban) {
-    const until = new Date(ban.until).toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  if (!ban) return next();
+  const until = new Date(ban.until).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  if (req.path.startsWith('/api')) {
     return res.status(403).json({
       error: `Triche détectée : progression remise à zéro et accès bloqué jusqu'à ${until}.`,
       bannedUntil: ban.until,
     });
   }
-  next();
+  res.status(403)
+    .set('Content-Type', 'text/html; charset=utf-8')
+    .set('Cache-Control', 'no-store')
+    .send(BAN_PAGE(until));
 });
 
 // --- API ---
