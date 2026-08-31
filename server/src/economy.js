@@ -30,8 +30,11 @@ import {
 // (frénésies ×7, pluies, cristaux, chanceuses) tourne autour de ×4-5
 // sa production de base : on laisse ×6.
 const EARN_FACTOR = 6;
-// Plafond physique de clics/s (manuel ~10-15 + auto-clicker 8/s).
-const CLICK_RATE_CAP = 30;
+// Plafond de clics/s : les autoclickers externes sont la base du genre —
+// on couvre largement (150/s courant, jusqu'à ~200 pour les plus agressifs).
+// L'in-game (Emmanuel2403) est crédité dans le taux de production et ne
+// compte pas dans le compteur de clics.
+export const CLICK_RATE_CAP = 200;
 // Le taux déclaré ne peut pas dépasser la capacité réelle de l'état
 // (frénésie ×7 + marge d'achat en cours de session).
 const RATE_FACTOR = 8;
@@ -96,7 +99,9 @@ export function theoreticalProduction(state) {
   return rate * globalMult * renaissanceMult * crystalMult * staffMults(state).production;
 }
 
-function theoreticalClickPower(state) {
+// Puissance de clic théorique de l'état — sert à budgéter les gains des
+// autoclickers externes (la base du genre) dans la fenêtre anti-triche.
+export function theoreticalClickPower(state) {
   const upgrades = Array.isArray(state.upgrades) ? state.upgrades : [];
   let mult = 1;
   for (const u of UPGRADES) {
@@ -323,8 +328,10 @@ export function verifyEconomy(state, ctx = {}) {
     return reject('succès');
   }
 
-  // 7. Compteurs bornés par le temps réel et le catalogue.
-  if (clicks > windowSec * CLICK_RATE_CAP + 1000) {
+  // 7. Compteurs bornés par le temps réel et le catalogue. Les clics
+  //    n'existent que pendant le temps de jeu réellement joué (pas de
+  //    clic hors-ligne), d'où playSec et non la fenêtre à 7 jours.
+  if (clicks > playSec * CLICK_RATE_CAP + 1000) {
     return reject('clics');
   }
   if (renaissances > 10_000 || (state.staff || []).length > STAFF.length) {

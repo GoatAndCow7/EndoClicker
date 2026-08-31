@@ -171,5 +171,21 @@ const collector = {
 r = verifyEconomy(collector, { accountAgeMs: 90 * 24 * HOUR, declaredRate: theoreticalProduction(collector) });
 check('collectionneur honnête accepté', r.ok);
 
+// --- 15. Autoclicker externe à 150 clics/s pendant 2 h ---
+// C'est la base d'un cookie clicker : ça ne doit JAMAIS être refusé.
+// Pioches ×48, frénésies occasionnelles (≈ ×2 en moyenne).
+const grinder = {
+  endocraft: 1e5, totalEndocraft: 1.4e8, lifetimeEndocraft: 1.4e8,
+  lastRenaissanceLifetime: 0, clicks: 1_080_000, playMs: 2 * HOUR,
+  renaissances: 0, generators: {},
+  upgrades: ['pick-bois','pick-pierre','pick-fer','pick-diamant','pick-netherite'],
+  staff: [], cosmetics: [], achievements: ['click-1000'],
+};
+r = verifyEconomy(grinder, { accountAgeMs: 3 * HOUR, declaredRate: 100 });
+check('autoclicker 150 clics/s pendant 2 h accepté', r.ok);
+// Compteur gonflé à la main : 10 M de clics en 2 h (1400/s) — refusé.
+r = verifyEconomy({ ...grinder, clicks: 1e7, totalEndocraft: 1e8, lifetimeEndocraft: 1e8 }, { accountAgeMs: 3 * HOUR });
+check('10 M de clics en 2 h refusés (raison=' + r.reason + ')', !r.ok);
+
 console.log(`\n${pass} ok, ${fail} échec(s)`);
 process.exit(fail ? 1 : 0);

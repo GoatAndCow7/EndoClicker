@@ -244,8 +244,14 @@ une seule source de vérité, zéro divergence au rééquilibrage).
 - **Taux déclaré plafonné** par la capacité réelle de l'état (frénésie
   ×7 + marge) : le plafond de la fenêtre anti-triche ne peut plus être
   gonflé par une fausse déclaration.
-- **Compteurs bornés** : clics ≤ 30/s de temps de jeu, succès et staff
-  ≤ catalogue, aucune valeur infinie.
+- **Compteurs bornés** : clics ≤ 200/s de temps de jeu (les
+  autoclickers externes sont la base du genre : 150/s courant passe
+  sans souci — l'in-game d'Emmanuel2403 est crédité dans le taux de
+  production et ne compte pas dans le compteur), succès et staff
+  ≤ catalogue, aucune valeur infinie. Les gains par clics sont
+  budgétés dans la fenêtre anti-triche (clics × puissance, frénésie
+  ×7 comprise) : un build clicueur sync sans friction, seul le
+  compteur gonflé à la main tombe.
 
 Deux remparts supplémentaires : une **CSP stricte** (aucun script
 inline ou externe — un userscript naïf ou du XSS n'exécute rien) et

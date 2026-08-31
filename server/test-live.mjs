@@ -106,5 +106,32 @@ const csp = head.headers.get('content-security-policy');
 check('CSP stricte servie', /script-src 'self'/.test(csp || ''));
 check('nosniff servi', head.headers.get('x-content-type-options') === 'nosniff');
 
+// --- Autoclicker externe : les gains par clics doivent passer la fenêtre
+//     de gain même sans production passive (c'est la base du genre) ---
+const tokC = await register('Grindeur');
+const base = {
+  endocraft: 500, totalEndocraft: 3000, lifetimeEndocraft: 3000,
+  lastRenaissanceLifetime: 0, clicks: 100, playMs: 60_000, renaissances: 0,
+  generators: {}, upgrades: ['pick-bois'], staff: [], cosmetics: [],
+  achievements: ['click-1'],
+};
+r = await put(tokC, { productionRate: 1, state: base });
+check('Grindeur : première sync acceptée (' + r.status + ')', r.status === 200);
+await new Promise((res) => setTimeout(res, 4000));
+// 4 s d'autoclicker agressif (+1100 clics) sous frénésie ×7 :
+// puissance ×2 (pick-bois) → +15 400 gagnés, sans production passive.
+const ground = {
+  ...base,
+  clicks: 1200,
+  totalEndocraft: 15_400,
+  lifetimeEndocraft: 15_400,
+  playMs: 64_000,
+};
+r = await put(tokC, { productionRate: 1, state: ground });
+check(
+  'Grindeur : gains d\'autoclicker acceptés au-delà du taux de production (' + r.status + ')',
+  r.status === 200
+);
+
 console.log(`\n${pass} ok, ${fail} échec(s)`);
 process.exit(fail ? 1 : 0);

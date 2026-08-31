@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db, now } from './db.js';
 import { requireAuth } from './middleware/auth.js';
-import { verifyEconomy } from './economy.js';
+import { verifyEconomy, theoreticalClickPower, CLICK_RATE_CAP } from './economy.js';
 import { recordStrike, applySanction } from './sanction.js';
 
 export const stateRouter = Router();
@@ -129,7 +129,27 @@ stateRouter.put('/state', requireAuth, (req, res) => {
         cappedRate(row.baseline_rate, safeRate)
       );
       const allowance = Math.max(5000, row.total_endocraft * 0.35);
-      const maxGain = effectiveRate * lookback * RATE_TOLERANCE + allowance;
+      // Budget clics : les autoclickers externes sont la base du genre.
+      // Leurs gains (clics × puissance, frénésie ×7 comprise) sont couverts
+      // au-delà du seul taux de production déclarée — sinon un joueur au
+      // autoclicker verrait ses synchros refusées en boucle. Seuls les
+      // clics physiquement possibles sur l'intervalle sont budgétés
+      // (≤ 200/s) : gonfler le compteur et le total ensemble ne passe pas.
+      const clicksIn = Math.max(0, Math.floor(Number(state.clicks) || 0));
+      let storedClicks = 0;
+      try {
+        storedClicks = Math.floor(Number(JSON.parse(row.state).clicks) || 0);
+      } catch {
+        /* état stocké illisible : borne à zéro */
+      }
+      const billedClicks = Math.min(
+        Math.max(0, clicksIn - storedClicks),
+        CLICK_RATE_CAP * lookback + 1000
+      );
+      const clickBudget =
+        billedClicks * theoreticalClickPower(state) * 8 + 10_000;
+      const maxGain =
+        effectiveRate * lookback * RATE_TOLERANCE + allowance + clickBudget;
       if (total > row.total_endocraft + maxGain) {
         return res.status(422).json({
           error: 'Progression implausible, sauvegarde refusée',
@@ -165,9 +185,13 @@ stateRouter.put('/state', requireAuth, (req, res) => {
     );
   } else {
     // Première sauvegarde (ex: migration d'une session invité) :
-    // bornée par ce que la production déclarée peut produire en 7 jours.
+    // bornée par ce que la production déclarée peut produire en 7 jours,
+    // clics d'autoclicker compris (≤ 200/s, frénésie ×7 couverte).
+    const clicksIn = Math.max(0, Math.floor(Number(state.clicks) || 0));
     const maxFirst =
-      safeRate * (MAX_MIGRATION_LOOKBACK_MS / 1000) * RATE_TOLERANCE + 1e9;
+      safeRate * (MAX_MIGRATION_LOOKBACK_MS / 1000) * RATE_TOLERANCE +
+      clicksIn * theoreticalClickPower(state) * 8 +
+      1e9;
     if (total > maxFirst) {
       return res.status(422).json({
         error: 'Progression implausible, sauvegarde refusée',
