@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api/client';
 import { fmt } from '../game/format';
 import { useAuth } from '../auth/useAuth';
@@ -134,9 +135,11 @@ export default function Leaderboard() {
         );
       })}
 
-      {viewing && (
-        <ProfileModal pseudo={viewing} onClose={() => setViewing(null)} />
-      )}
+      {viewing &&
+        createPortal(
+          <ProfileModal pseudo={viewing} onClose={() => setViewing(null)} />,
+          document.body
+        )}
 
       {!user && entries.length > 0 && (
         <button

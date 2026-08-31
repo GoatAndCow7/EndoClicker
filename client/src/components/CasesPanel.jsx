@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useGame } from '../game/store';
 import { fmt } from '../game/format';
 import {
@@ -769,16 +770,23 @@ export default function CasesPanel() {
           : 'La première caisse est toujours la meilleure. C’est scientifique.'}
       </p>
 
-      {contents && (
-        <ContentsModal box={contents} onClose={() => setContents(null)} />
-      )}
-      {opening && (
-        <CaseOpeningModal
-          box={opening.box}
-          count={opening.count}
-          onDone={() => setOpening(null)}
-        />
-      )}
+      {/* Modales rendues en portal sur <body> : elles couvrent toujours
+          tout l'écran, quoi que fassent les ancêtres (transform animé,
+          overflow, etc.). */}
+      {contents &&
+        createPortal(
+          <ContentsModal box={contents} onClose={() => setContents(null)} />,
+          document.body
+        )}
+      {opening &&
+        createPortal(
+          <CaseOpeningModal
+            box={opening.box}
+            count={opening.count}
+            onDone={() => setOpening(null)}
+          />,
+          document.body
+        )}
     </div>
   );
 }
