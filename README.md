@@ -109,11 +109,11 @@ Le seuil se farme **depuis la dernière renaissance** (le total à vie ne suffit
 
 | Renaissance | Seuil à farmer | Bonus permanent | Braises du Phénix |
 |---|---|---|---|
-| 1re | 500 B | ×1,44 | 2,5 Md |
-| 2e | 1,5 T | ×1,98 | 5 Md |
-| 3e | 4,5 T | ×2,66 | 7,5 Md |
-| 5e | 40,5 T | ×4,53 | 12,5 Md |
-| 10e | 9,8 Qa | ×14,2 | 25 Md |
+| 1re | 500 B | ×1,44 | 500 M |
+| 2e | 1,5 T | ×1,98 | 1 Md |
+| 3e | 4,5 T | ×2,66 | 1,5 Md |
+| 5e | 40,5 T | ×4,53 | 2,5 Md |
+| 10e | 9,8 Qa | ×14,2 | 5 Md |
 
 On **garde** : succès, cosmétiques, tags, exclusives de caisses, stats à vie.
 On **perd** : solde (remplacé par les braises), générateurs, améliorations (hors exclusives) et équipe.

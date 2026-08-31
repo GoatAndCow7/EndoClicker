@@ -755,7 +755,7 @@ export const CASES = [
 // ne suffit plus : impossible d'enchaîner les renaissances sur un gros
 // total historique), on peut tout recommencer à zéro contre :
 // - un bonus de production permanent B(n) = (1 + 0,25n) × 1,15^n
-// - les « Braises du Phénix » : n × 2,5 Md d'EndoCraft de départ
+// - les « Braises du Phénix » : n × 500 M d'EndoCraft de départ
 // On garde : succès, cosmétiques, tags, exclusives de caisses, stats.
 // On perd : solde (remplacé par les braises), générateurs, améliorations,
 // équipe.
@@ -764,7 +764,7 @@ export const RENAISSANCE = {
   thresholdGrowth: 3, // ×3 par renaissance suivante (1,5 T, 4,5 T, 13,5 T…)
   multPerRenaissance: 0.25, // part additive du bonus : +25 % par renaissance
   multGrowth: 1.15, // part multiplicative : ×1,15 par renaissance
-  emberBankPerRenaissance: 2.5e9, // Braises du Phénix : 2,5 Md par renaissance
+  emberBankPerRenaissance: 5e8, // Braises du Phénix : 500 M par renaissance
 };
 
 // Bonus de production permanent pour n renaissances
