@@ -161,7 +161,7 @@ export default function ProfileModal({ pseudo, onClose }) {
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               <ProfileStat
                 icon="💰"
-                label="Récolté"
+                label="Récolté à vie"
                 value={fmt(profile.totalEndocraft)}
               />
               <ProfileStat

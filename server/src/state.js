@@ -80,7 +80,10 @@ stateRouter.put('/state', requireAuth, (req, res) => {
         .prepare('SELECT pseudo FROM users WHERE id = ?')
         .get(req.user.id)?.pseudo;
       console.warn(
-        `[anti-triche] ${pseudo} (#${req.user.id}, IP ${req.ip}) : ${audit.reason} (avertissement ${strike}/2)`
+        `[anti-triche] ${pseudo} (#${req.user.id}, IP ${req.ip}) : ${audit.reason}` +
+          ` — envoyé total=${total.toExponential(2)} à-vie=${(Math.max(0, Number(state.lifetimeEndocraft) || 0)).toExponential(2)}` +
+          `, stocké total=${row ? row.total_endocraft : 0} à-vie=${row ? row.lifetime_endocraft : 0}, taux=${rate.toExponential(2)}` +
+          ` (avertissement ${strike}/2)`
       );
       if (strike >= 2) {
         applySanction({ userId: req.user.id, ip: req.ip, reason: audit.reason });
@@ -132,17 +135,11 @@ stateRouter.put('/state', requireAuth, (req, res) => {
           error: 'Progression implausible, sauvegarde refusée',
         });
       }
-      // Même fenêtre pour le total à vie (pas de colonne dédiée : il est
-      // relu de l'état stocké). Sans ça, un état forgé gonflerait sa
+      // Même fenêtre pour le total à vie (colonne dédiée, jamais remise à
+      // zéro par une Renaissance). Sans ça, un état forgé gonflerait sa
       // progression « historique » pour faire passer l'inventaire.
       const lifetime = Math.max(0, Number(state.lifetimeEndocraft) || 0);
-      let storedLifetime = 0;
-      try {
-        storedLifetime = Number(JSON.parse(row.state).lifetimeEndocraft) || 0;
-      } catch {
-        /* état stocké illisible : borne à zéro */
-      }
-      if (lifetime > storedLifetime + maxGain) {
+      if (lifetime > row.lifetime_endocraft + maxGain) {
         return res.status(422).json({
           error: 'Progression implausible, sauvegarde refusée',
         });
@@ -152,12 +149,13 @@ stateRouter.put('/state', requireAuth, (req, res) => {
     // d'un facteur 2 à chaque synchro sinon : il ne peut plus être gonflé
     // une fois pour toutes par une fausse déclaration.
     db.prepare(
-      `UPDATE states SET state = ?, total_endocraft = ?, achievements = ?, renaissances = ?,
+      `UPDATE states SET state = ?, total_endocraft = ?, lifetime_endocraft = ?, achievements = ?, renaissances = ?,
        baseline_at = ?, baseline_rate = MAX(MIN(?, baseline_rate * 8 + 50000), baseline_rate * 0.5), updated_at = ?
        WHERE user_id = ?`
     ).run(
       JSON.stringify({ ...state, rev: row.rev }),
       total,
+      Math.max(0, Number(state.lifetimeEndocraft) || 0),
       achievements,
       renaissances,
       t,
@@ -176,10 +174,10 @@ stateRouter.put('/state', requireAuth, (req, res) => {
       });
     }
     db.prepare(
-      `INSERT INTO states (user_id, state, total_endocraft, achievements,
+      `INSERT INTO states (user_id, state, total_endocraft, lifetime_endocraft, achievements,
        renaissances, baseline_at, baseline_rate, rev, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`
-    ).run(req.user.id, JSON.stringify({ ...state, rev: 0 }), total, achievements, renaissances, t, safeRate, t);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`
+    ).run(req.user.id, JSON.stringify({ ...state, rev: 0 }), total, Math.max(0, Number(state.lifetimeEndocraft) || 0), achievements, renaissances, t, safeRate, t);
   }
 
   db.prepare('UPDATE users SET updated_at = ? WHERE id = ?').run(t, req.user.id);

@@ -94,15 +94,15 @@ function resetProgression(userId, t) {
   const json = JSON.stringify(zero);
   if (row) {
     db.prepare(
-      `UPDATE states SET state = ?, total_endocraft = 0, achievements = 0,
+      `UPDATE states SET state = ?, total_endocraft = 0, lifetime_endocraft = 0, achievements = 0,
        renaissances = 0, baseline_at = ?, baseline_rate = 0, rev = ?, updated_at = ?
        WHERE user_id = ?`
     ).run(json, t, rev, t, userId);
   } else {
     db.prepare(
-      `INSERT INTO states (user_id, state, total_endocraft, achievements,
+      `INSERT INTO states (user_id, state, total_endocraft, lifetime_endocraft, achievements,
        renaissances, baseline_at, baseline_rate, rev, updated_at)
-       VALUES (?, ?, 0, 0, 0, ?, 0, ?, ?)`
+       VALUES (?, ?, 0, 0, 0, 0, ?, 0, ?, ?)`
     ).run(userId, json, t, rev, t);
   }
   db.prepare('UPDATE users SET updated_at = ? WHERE id = ?').run(t, userId);

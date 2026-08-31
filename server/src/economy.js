@@ -268,7 +268,18 @@ export function verifyEconomy(state, ctx = {}) {
     return reject('solde');
   }
 
-  // 3. Vitesse de gain : production + clics (boostés compris) sur la
+  // 3. Identité cycle / à vie : chaque gain crédite le total du cycle ET
+  //    le total à vie, la Renaissance remet le cycle à zéro et fige
+  //    l'ancre. Le client garantit donc TOUJOURS
+  //    total == lifetime − lastRenaissanceLifetime, à l'arrondi près.
+  //    Un total à vie de 1e308 avec un cycle à 1e67 est forgé, par
+  //    construction.
+  const cycleSlack = Math.max(1e9, total * 1e-3);
+  if (Math.abs(total - (lifetime - lastRen)) > cycleSlack) {
+    return reject('cycle');
+  }
+
+  // 4. Vitesse de gain : production + clics (boostés compris) sur la
   //    fenêtre de temps réelle. Tuerait un total de 1e67 en 3 jours.
   const earnCap =
     (totalRate + CLICK_RATE_CAP * clickPower) * windowSec * EARN_FACTOR +

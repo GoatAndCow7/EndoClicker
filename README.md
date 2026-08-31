@@ -172,7 +172,7 @@ Variables d'environnement du serveur :
 | Variable | Défaut | Description |
 |---|---|---|
 | `PORT` | `3000` | Port d'écoute |
-| `JWT_SECRET` | à définir | Secret de signature des tokens |
+| `JWT_SECRET` | à définir | Secret de signature des tokens (**obligatoire en production : le serveur refuse de démarrer sans lui**) |
 | `DATA_DIR` | `/app/data` | Emplacement de la base SQLite (en local : `server/data`) |
 | `ADMIN_PSEUDO` | `GoatAndCow` | Pseudo du compte administrateur (réservé) |
 | `ADMIN_PASSWORD` | aléatoire | Mot de passe initial du compte admin s'il n'existe pas encore |
@@ -206,7 +206,7 @@ Le volume contient comptes, progressions et classement : ne le supprimez pas. Au
 | `/api/auth/login` | POST | non | Connexion |
 | `/api/state` | GET | oui | Progression cloud |
 | `/api/state` | PUT | oui | Sauvegarde (contrôle anti-triche) |
-| `/api/leaderboard` | GET | non | Top 20 |
+| `/api/leaderboard` | GET | non | Top 20 (score = total à vie, conservé après une Renaissance) |
 | `/api/profile/:pseudo` | GET | non | Profil public |
 | `/api/events` | GET (SSE) | oui | Flux temps réel (token en query string : EventSource n'envoie pas d'en-têtes) |
 | `/api/admin/*` | divers | admin | Gestion des joueurs |
@@ -221,6 +221,10 @@ produisible**, recalculé depuis les tables du jeu
 (`server/src/economy.js` importe directement les constantes du client :
 une seule source de vérité, zéro divergence au rééquilibrage).
 
+- **Identité cycle / à vie** : chaque gain crédite le total du cycle ET
+  le total à vie, la Renaissance remet le cycle à zéro et fige l'ancre.
+  Le client garantit donc toujours `cycle == à-vie − ancre` : un état
+  avec 1e308 « à vie » et 1e67 au cycle est forgé par construction.
 - **Inventaire ≤ gains** : le coût cumulé des générateurs (série
   géométrique ×1,15), améliorations, recrutements et cosmétiques ne
   peut pas dépasser le total à vie (+ braises des renaissances, marge
@@ -242,6 +246,19 @@ une seule source de vérité, zéro divergence au rééquilibrage).
   gonflé par une fausse déclaration.
 - **Compteurs bornés** : clics ≤ 30/s de temps de jeu, succès et staff
   ≤ catalogue, aucune valeur infinie.
+
+Deux remparts supplémentaires : une **CSP stricte** (aucun script
+inline ou externe — un userscript naïf ou du XSS n'exécute rien) et
+le **secret JWT obligatoire en production** (le serveur refuse de
+démarrer sans `JWT_SECRET` : impossible de forger des tokens avec le
+secret de dev public du dépôt). Une extension navigateur en MAIN
+world passe outre la CSP, mais elle se heurte à la validation serveur
+— et son « fetch hook » qui masque les 422 ne change rien côté
+serveur : les avertissements tombent quand même.
+
+Le **score du classement est le total à vie** : renaître ne fait plus
+chuter au rang (l'ancien score de cycle retombait à zéro à chaque
+Renaissance).
 
 ### Sanctions automatiques
 

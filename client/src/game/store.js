@@ -375,6 +375,9 @@ export const useGame = create((set, get) => ({
   toasts: [],
   offlineReport: null, // { durationMs, gains }
   cloudSyncError: false,
+  // Non-nul : ce compte est banni temporairement (sanction anti-triche) —
+  // l'horodatage sert au bandeau d'état.
+  cloudBannedUntil: 0,
   lastSyncAt: 0,
   // True une fois l'état cloud récupéré au démarrage : aucune sync montante
   // ne doit partir avant, sinon on écrase le cloud avec un local vide.
@@ -1384,6 +1387,8 @@ export const useGame = create((set, get) => ({
     // Au démarrage, on attend d'avoir récupéré l'état cloud (useAuth.init)
     // avant d'envoyer quoi que ce soit.
     if (!get().cloudReady) return;
+    // Compte banni (sanction anti-triche) : inutile de marteler l'API
+    if (get().cloudBannedUntil > Date.now()) return;
     const s = get();
     try {
       await api('/api/state', {
@@ -1417,6 +1422,9 @@ export const useGame = create((set, get) => ({
         // Le temps écoulé grandissant, une synchro légitime finira par passer —
         // on ne gèle JAMAIS les tentatives, sinon le score resterait figé.
         set({ cloudSyncError: true });
+      } else if (e.status === 403 && e.data?.bannedUntil) {
+        // Sanction : progression cloud remise à zéro, API fermée 24 h.
+        set({ cloudSyncError: true, cloudBannedUntil: e.data.bannedUntil });
       }
       // Autres erreurs réseau : on retentera au prochain cycle
     }

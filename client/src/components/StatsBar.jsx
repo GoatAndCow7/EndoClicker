@@ -213,6 +213,7 @@ function SyncStatus() {
   const user = useAuth((s) => s.user);
   const lastSyncAt = useGame((s) => s.lastSyncAt);
   const cloudSyncError = useGame((s) => s.cloudSyncError);
+  const cloudBannedUntil = useGame((s) => s.cloudBannedUntil);
   const [, force] = useState(0);
 
   useEffect(() => {
@@ -227,10 +228,21 @@ function SyncStatus() {
       </p>
     );
   }
+  if (cloudBannedUntil > Date.now()) {
+    return (
+      <p className="text-3xs font-semibold text-danger-bright">
+        🚫 Triche détectée — progression remise à zéro, accès bloqué jusqu'
+        {new Date(cloudBannedUntil).toLocaleTimeString('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </p>
+    );
+  }
   if (cloudSyncError) {
     return (
       <p className="text-3xs font-semibold text-warning-bright">
-        ⚠️ Synchro cloud refusée — nouvelle tentative en cours…
+        ⚠️ Synchro cloud refusée — progression non classée, nouvelle tentative…
       </p>
     );
   }

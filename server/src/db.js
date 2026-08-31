@@ -30,10 +30,13 @@ db.exec(`
     state TEXT NOT NULL,
     total_endocraft REAL NOT NULL DEFAULT 0,
     achievements INTEGER NOT NULL DEFAULT 0,
-    -- Date du dernier reset de score (anti-triche, en ms)
-    baseline_at INTEGER NOT NULL,
-    -- Plafond théorique de gain depuis baseline (endocraft/s max plausible)
-    baseline_rate REAL NOT NULL DEFAULT 0,
+  -- Date du dernier reset de score (anti-triche, en ms)
+  baseline_at INTEGER NOT NULL,
+  -- Plafond théorique de gain depuis baseline (endocraft/s max plausible)
+  baseline_rate REAL NOT NULL DEFAULT 0,
+  -- Total à vie (jamais remis à zéro, même à la Renaissance) :
+  -- c'est LUI le score du classement — renaître ne fait pas chuter.
+  lifetime_endocraft REAL NOT NULL DEFAULT 0,
     -- Révision de l'état : incrémentée à chaque édition admin.
     -- Sert d'accès concurrentiel optimiste (409 si le client est périmé).
     rev INTEGER NOT NULL DEFAULT 0,
@@ -74,6 +77,23 @@ db.exec(`
   }
   if (!cols.some((c) => c.name === 'anti_cheat_disabled')) {
     db.exec('ALTER TABLE states ADD COLUMN anti_cheat_disabled INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!cols.some((c) => c.name === 'lifetime_endocraft')) {
+    db.exec('ALTER TABLE states ADD COLUMN lifetime_endocraft REAL NOT NULL DEFAULT 0');
+    // Rattrapage : le total à vie est relu de chaque état stocké
+    const rows = db.prepare('SELECT user_id, state FROM states').all();
+    const update = db.prepare(
+      'UPDATE states SET lifetime_endocraft = ? WHERE user_id = ?'
+    );
+    for (const r of rows) {
+      let lifetime = 0;
+      try {
+        lifetime = Math.max(0, Number(JSON.parse(r.state).lifetimeEndocraft) || 0);
+      } catch {
+        /* état illisible : reste à zéro */
+      }
+      update.run(lifetime, r.user_id);
+    }
   }
   const userCols = db.prepare('PRAGMA table_info(users)').all();
   if (!userCols.some((c) => c.name === 'last_login_at')) {

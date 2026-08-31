@@ -13,6 +13,16 @@ import { normalizeIp, getBan } from './sanction.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
+// Secret de signature obligatoire en production : sans lui, n'importe qui
+// peut forger des tokens (dont admin) avec le secret de dev public du dépôt.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error(
+    '🛑 JWT_SECRET non défini en production — le serveur refuse de démarrer.\n' +
+      '   Générez un secret (ex : openssl rand -hex 32) et définissez JWT_SECRET.'
+  );
+  process.exit(1);
+}
+
 // Compte administrateur (créé s'il manque, jamais écrasé)
 seedAdmin();
 
@@ -23,6 +33,21 @@ const app = express();
 // Ajuster TRUST_PROXY au nombre de proxies en cascade si besoin.
 app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
 app.use(express.json({ limit: '256kb' }));
+
+// Content-Security-Policy : le jeu n'a aucun script inline ni externe —
+// un script injecté dans la page (userscript naïf, XSS) ne s'exécute pas.
+// Les extensions navigateur en MAIN world passent outre, mais celles-là
+// se heurtent à la validation serveur.
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src 'self'; " +
+      "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 
 // Journal des requêtes API (diagnostic des synchros)
 app.use((req, res, next) => {

@@ -28,11 +28,14 @@ const inv = {
 };
 const spentInv = inventorySpent(inv);
 const rate2 = theoreticalProduction({ ...inv, renaissances: 3, equippedCoin: 'default' });
-const playSec2 = 40 * 3600;
+// Identité client : cycle = à-vie − ancre (chaque gain crédite les deux,
+// la Renaissance remet le cycle à zéro). L'ancre couvre les seuils des
+// 3 renaissances (500 B × 13 ≈ 6,5 T).
+const cycle2 = spentInv * 1.05;
 const honest2 = {
   endocraft: 5e11,
-  totalEndocraft: rate2 * playSec2 * 2,
-  lifetimeEndocraft: spentInv * 1.1 + 6.5e12, // inventaire + seuils des 3 renaissances
+  totalEndocraft: cycle2,
+  lifetimeEndocraft: 6.5e12 + cycle2,
   lastRenaissanceLifetime: 6.5e12,
   clicks: 40_000, playMs: 40 * HOUR, renaissances: 3,
   ...inv, achievements: ['click-1','total-1m'],
@@ -40,6 +43,13 @@ const honest2 = {
 r = verifyEconomy(honest2, { accountAgeMs: 5 * 24 * HOUR, declaredRate: rate2 });
 check('fin de jeu honnête accepté (inventaire payé ' + spentInv.toExponential(2) + ', taux ' + rate2.toExponential(2) + ')', r.ok);
 check('taux déclaré plafonné à la capacité réelle', r.maxRate >= rate2);
+
+// --- 1b. Identité cycle / à vie : 1e308 à vie avec 1e67 au cycle ---
+r = verifyEconomy(
+  { ...honest1, lifetimeEndocraft: 1.47e308, totalEndocraft: 1e67, playMs: 10 * HOUR },
+  { accountAgeMs: 24 * HOUR }
+);
+check('cycle 1e67 vs à-vie 1.47e308 refusé (raison=' + r.reason + ')', !r.ok);
 
 // --- 3. « Max tout le jeu » : ×1000 partout, lifetime bidon bas ---
 const cheat1 = {

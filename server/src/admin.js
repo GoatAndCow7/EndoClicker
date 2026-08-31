@@ -124,13 +124,14 @@ function saveAdminState(userId, state, productionRate = 0) {
 
   if (row) {
     db.prepare(
-      `UPDATE states SET state = ?, total_endocraft = ?, achievements = ?, renaissances = ?,
+      `UPDATE states SET state = ?, total_endocraft = ?, lifetime_endocraft = ?, achievements = ?, renaissances = ?,
        baseline_at = ?, baseline_rate = MAX(baseline_rate, ?), rev = ?, updated_at = ?,
        anti_cheat_disabled = CASE WHEN ? THEN 1 ELSE anti_cheat_disabled END
        WHERE user_id = ?`
     ).run(
       JSON.stringify(stored),
       state.totalEndocraft,
+      Math.max(0, Number(state.lifetimeEndocraft) || 0),
       state.achievements.length,
       Math.max(0, Math.floor(Number(state.renaissances) || 0)),
       t, // reset anti-triche : l'état admin devient la nouvelle référence
@@ -142,13 +143,14 @@ function saveAdminState(userId, state, productionRate = 0) {
     );
   } else {
     db.prepare(
-      `INSERT INTO states (user_id, state, total_endocraft, achievements,
+      `INSERT INTO states (user_id, state, total_endocraft, lifetime_endocraft, achievements,
        renaissances, baseline_at, baseline_rate, rev, anti_cheat_disabled, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       userId,
       JSON.stringify(stored),
       state.totalEndocraft,
+      Math.max(0, Number(state.lifetimeEndocraft) || 0),
       state.achievements.length,
       Math.max(0, Math.floor(Number(state.renaissances) || 0)),
       t,
