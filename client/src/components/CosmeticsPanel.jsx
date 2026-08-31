@@ -1,7 +1,15 @@
-import { COIN_SKINS, TAGS, TAG_BY_ID, RARITIES } from '../game/constants';
+import { COIN_SKINS, TAGS, RARITIES } from '../game/constants';
 import { useGame } from '../game/store';
 import { fmt } from '../game/format';
 import { fx } from '../game/fx';
+
+// Relance une animation CSS (remove → reflow → add), après le
+// re-rendu React déclenché par l'achat.
+const replay = (el, cls) => {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+};
 
 export default function CosmeticsPanel() {
   const endocraft = useGame((s) => s.endocraft);
@@ -14,108 +22,107 @@ export default function CosmeticsPanel() {
   const equipTag = useGame((s) => s.equipTag);
 
   const handleBuy = (e, id) => {
-    if (buyCosmetic(id)) {
-      fx.burst(e.clientX, e.clientY, { count: 24, power: 1.3 });
-      fx.confetti();
-    }
+    const card = e.currentTarget.closest('[data-ec-card]');
+    if (!buyCosmetic(id)) return;
+    fx.burst(e.clientX, e.clientY, { count: 24, power: 1.3 });
+    fx.confetti();
+    if (card) requestAnimationFrame(() => replay(card, 'is-flashing'));
   };
 
   return (
     <div className="space-y-3">
       <div className="px-1">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-          Cosmétiques
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Chaque skin apporte son <b>pouvoir unique</b> quand il est équipé — en
-          plus de teinter tous les effets de vos clics.
+        <h2 className="section-title">Cosmétiques</h2>
+        <p className="mt-1 text-2xs text-ink-3">
+          Chaque skin apporte son <b>pouvoir unique</b> quand il est équipé —
+          en plus de teinter tous les effets de vos clics.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         {COIN_SKINS.map((skin) => {
-          const owned = skin.cost === 0 || cosmetics.includes(skin.id);
+          const owned = skin.id === 'default' || cosmetics.includes(skin.id);
           const equipped = equippedCoin === skin.id;
-          const affordable = endocraft >= skin.cost;
+          const affordable = !skin.caseOnly && endocraft >= skin.cost;
 
           return (
             <div
               key={skin.id}
-              className={`rounded-xl border p-4 text-center transition-colors ${
+              data-ec-card
+              className={`relative flex flex-col rounded-xl border p-4 text-center transition-colors ec-flash ${
                 equipped
-                  ? 'border-emerald-500/50 bg-emerald-950/20'
+                  ? 'border-success/50 bg-success-deep/30'
                   : owned
-                    ? 'border-white/10 bg-white/5'
+                    ? 'border-line/15 bg-surface/5'
                     : affordable
-                      ? 'border-ember-500/40 bg-ember-950/20'
-                      : 'border-white/10 bg-black/30 opacity-70'
+                      ? 'border-accent/40 bg-accent-overlay/20'
+                      : 'shop-item-locked border-line/10 bg-void/30'
               }`}
             >
               {/* Aperçu du skin */}
-              <div className="relative mx-auto flex h-28 w-28 items-center justify-center">
+              <div
+                className={`relative mx-auto flex h-28 w-28 items-center justify-center ${
+                  equipped ? 'rounded-full ring-2 ring-success/50' : ''
+                }`}
+              >
                 <div
-                  className={`absolute inset-0 rounded-full blur-2xl ${
-                    equipped || affordable
-                      ? 'bg-ember-500/25'
-                      : 'bg-white/5'
-                  }`}
+                  className="absolute inset-0 rounded-full blur-2xl"
+                  style={{
+                    backgroundColor:
+                      skin.fx?.halo || 'rgb(var(--accent) / 0.25)',
+                  }}
                 />
                 <img
                   src={skin.icon}
                   alt={skin.name}
                   draggable={false}
-                  className={`relative h-24 w-24 object-contain ${
-                    !owned ? 'grayscale-[0.5]' : ''
+                  className={`relative h-28 w-28 object-contain drop-shadow-lg ${
+                    owned ? '' : 'grayscale-[0.4]'
                   }`}
-                  style={skin.imgFilter ? { filter: skin.imgFilter } : undefined}
+                  style={
+                    skin.imgFilter ? { filter: skin.imgFilter } : undefined
+                  }
                 />
               </div>
 
-              <p className="mt-2 font-bold">{skin.name}</p>
-              <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
+              <p className="mt-2 font-bold text-ink">{skin.name}</p>
+              <p className="mt-0.5 text-2xs leading-snug text-ink-3">
                 {skin.desc}
               </p>
               {skin.perk && (
-                <p
-                  className={`mt-1.5 text-[11px] font-semibold leading-snug ${
-                    skin.perk.id
-                      ? 'text-ember-300'
-                      : 'text-slate-500'
-                  }`}
-                >
-                  {skin.perk.id ? '⚡ ' : ''}
-                  {skin.perk.label}
+                <p className="mt-2 flex justify-center">
+                  <span className="chip chip-warning max-w-full text-center leading-snug">
+                    {skin.perk.id ? '⚡ ' : ''}
+                    {skin.perk.label}
+                  </span>
                 </p>
               )}
 
-              <div className="mt-3">
+              <div className="mt-3 flex flex-1 flex-col justify-end">
                 {equipped ? (
-                  <span className="inline-block rounded-lg border border-emerald-500/40 bg-emerald-600/15 px-3 py-1.5 text-xs font-bold text-emerald-300">
-                    ✓ Équipé
-                  </span>
+                  <span className="chip chip-success mx-auto">✓ Équipé</span>
                 ) : owned ? (
                   <button
                     onClick={() => equipCoin(skin.id)}
-                    className="btn-ghost text-xs"
+                    className="btn btn-primary focus-ring h-11 w-full text-2xs md:h-9"
                   >
                     Équiper
                   </button>
                 ) : skin.caseOnly ? (
-                  <span className="inline-block rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-300">
-                    🎁 Exclusif caisse
-                  </span>
-                ) : (
+                  <p className="empty-state py-2 text-2xs">
+                    🎁 Exclusif caisse de l’End
+                  </p>
+                ) : affordable ? (
                   <button
                     onClick={(e) => handleBuy(e, skin.id)}
-                    disabled={!affordable}
-                    className={`btn text-xs ${
-                      affordable
-                        ? 'btn-primary'
-                        : 'cursor-not-allowed bg-white/5 text-slate-400 opacity-60'
-                    }`}
+                    className="btn btn-primary focus-ring h-11 w-full text-2xs md:h-9"
                   >
-                    🪙 {fmt(skin.cost)}
+                    Acheter — 🪙 {fmt(skin.cost)}
                   </button>
+                ) : (
+                  <p className="text-2xs font-semibold tabular-nums text-accent-soft">
+                    🪙 {fmt(skin.cost)}
+                  </p>
                 )}
               </div>
             </div>
@@ -125,10 +132,8 @@ export default function CosmeticsPanel() {
 
       {/* ---- Tags de prestige (exclusifs cases) ---- */}
       <div className="px-1 pt-2">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-          🏷️ Tags de prestige
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
+        <h2 className="section-title">Tags de prestige</h2>
+        <p className="mt-1 text-2xs text-ink-3">
           Titres affichés à côté de votre pseudo au classement. Exclusifs des
           caisses 🎁.
         </p>
@@ -143,24 +148,29 @@ export default function CosmeticsPanel() {
               key={tag.id}
               onClick={() => owned && equipTag(tag.id)}
               disabled={!owned}
-              className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
-                equipped
-                  ? 'border-emerald-400/60 bg-emerald-600/20 text-emerald-200'
-                  : owned
-                    ? 'cursor-pointer text-slate-200 hover:bg-white/10'
-                    : 'cursor-not-allowed text-slate-600'
+              className={`focus-ring rarity-${tag.rarity} h-11 md:h-9 rounded-full border px-3 text-2xs font-bold transition-colors ${
+                owned ? 'rarity-text' : 'border-line/15 text-ink-4'
               }`}
-              style={{
-                borderColor: owned ? r.color : undefined,
-                background: owned ? `${r.color}18` : undefined,
-                boxShadow: owned ? `0 0 10px ${r.glow}` : undefined,
-              }}
+              style={
+                owned
+                  ? {
+                      borderColor: 'rgb(var(--rc) / 0.55)',
+                      background: 'rgb(var(--rc) / 0.1)',
+                      ...(equipped
+                        ? { boxShadow: '0 0 10px rgb(var(--rc) / 0.4)' }
+                        : {}),
+                    }
+                  : undefined
+              }
             >
-              {equipped ? '✓ ' : owned ? '' : '🔒 '}
+              {equipped && (
+                <span className="chip chip-accent -ml-1 mr-1 px-1.5">✓</span>
+              )}
+              {owned ? '' : '🔒 '}
               {tag.label}
               <span
-                className="ml-1.5 text-[9px] uppercase tracking-wider"
-                style={{ color: r.color }}
+                className="ml-1.5 text-3xs font-semibold uppercase tracking-wider opacity-80"
+                style={{ color: owned ? 'rgb(var(--rc))' : undefined }}
               >
                 {r.label}
               </span>

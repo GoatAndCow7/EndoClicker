@@ -11,6 +11,9 @@ const CONFETTI_COLORS = ['#fb8113', '#ffd9a3', '#4ade80', '#60a5fa', '#f472b6', 
 // (Clics rapides + auto-clicker + pluies pouvaient sinon empiler des
 // centaines de particules et faire laguer le navigateur.)
 const MAX_PARTICLES = 150;
+// Mouvement réduit : la décoration (particules, confettis) est coupée,
+// le texte flottant reste — c'est un feedback de gain essentiel.
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Thème par défaut (orange EndoCraft) — remplacé par fx.setTheme()
 const DEFAULT_THEME = {
@@ -89,7 +92,7 @@ class FX {
 
   // Éclat d'étincelles (clic sur l'EndoCraft)
   burst(x, y, { count = 14, power = 1 } = {}) {
-    if (document.hidden) return; // onglet en arrière-plan : zéro coût
+    if (REDUCED || document.hidden) return; // zéro coût si décoration coupée
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) break;
       const angle = Math.random() * Math.PI * 2;
@@ -113,7 +116,7 @@ class FX {
 
   // Confettis (succès, pomme dorée)
   confetti() {
-    if (document.hidden) return;
+    if (REDUCED || document.hidden) return;
     const w = window.innerWidth;
     for (let i = 0; i < 80; i++) {
       if (this.particles.length >= MAX_PARTICLES) break;

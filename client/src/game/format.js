@@ -3,6 +3,7 @@
 const UNITS = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc'];
 
 export function fmt(n) {
+  if (Number.isNaN(n)) return '—';
   if (!isFinite(n)) return '∞';
   if (n < 0) return '-' + fmt(-n);
   if (n < 1000) {
@@ -16,6 +17,7 @@ export function fmt(n) {
 }
 
 export function fmtInt(n) {
+  if (Number.isNaN(n)) return '—';
   return Math.floor(n).toLocaleString('fr-FR');
 }
 

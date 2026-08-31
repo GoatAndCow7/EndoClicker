@@ -6,13 +6,19 @@ import { playClick } from '../game/audio';
 import { COIN_SKIN_BY_ID } from '../game/constants';
 
 export default function ClickArea() {
-  const containerRef = useRef(null);
+  const sectionRef = useRef(null);
   const coinRef = useRef(null);
+  const orbRef = useRef(null);
   const click = useGame((s) => s.click);
   const generators = useGame((s) => s.generators);
   const upgrades = useGame((s) => s.upgrades);
   const boostMult = useGame((s) => s.boostMult);
   const boostEndsAt = useGame((s) => s.boostEndsAt);
+  // Tempête : booléen dérivé — l'objet change d'identité à chaque clic
+  // (compteur de mini-pommes), le booléen reste stable et ne re-rend rien.
+  const stormed = useGame(
+    (s) => !!s.shadowStorm && s.shadowStorm.endsAt > Date.now()
+  );
   const equippedCoin = useGame((s) => s.equippedCoin);
   const staff = useGame((s) => s.staff);
   const renaissances = useGame((s) => s.renaissances);
@@ -32,6 +38,52 @@ export default function ClickArea() {
     fx.setTheme(skin.fx || {});
   }, [skin]);
 
+  // Lueur qui accompagne la souris : desktop uniquement (pointeur fin et
+  // mouvement autorisé), déplacement en transform seul, throttlé à une
+  // frame, borné à ±90 px autour du centre de la zone de clic.
+  useEffect(() => {
+    const section = sectionRef.current;
+    const orb = orbRef.current;
+    if (!section || !orb) return;
+    if (
+      window.matchMedia('(pointer: coarse)').matches ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+
+    let raf = 0;
+    const move = (e) => {
+      if (raf) return;
+      const { clientX, clientY } = e;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const rect = section.getBoundingClientRect();
+        const dx = Math.max(
+          -90,
+          Math.min(90, clientX - rect.left - rect.width / 2)
+        );
+        const dy = Math.max(
+          -90,
+          Math.min(90, clientY - rect.top - rect.height / 2)
+        );
+        orb.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      });
+    };
+    const enter = () => orb.classList.add('on');
+    const leave = () => orb.classList.remove('on');
+
+    section.addEventListener('pointermove', move);
+    section.addEventListener('pointerenter', enter);
+    section.addEventListener('pointerleave', leave);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      section.removeEventListener('pointermove', move);
+      section.removeEventListener('pointerenter', enter);
+      section.removeEventListener('pointerleave', leave);
+    };
+  }, []);
+
   // Auto-clicker d'Emmanuel2403 : clics fantômes VISIBLES sur la pièce
   // (chiffre flottant + mini étincelles + petite onde), sans son.
   useEffect(() => {
@@ -46,7 +98,7 @@ export default function ClickArea() {
       const s = useGame.getState();
       const boost = s.boostEndsAt > Date.now() ? s.boostMult : 1;
       const gain = getClickPower(s) * boost;
-      fx.float(x, y, `+${fmt(gain)}`);
+      fx.float(x, y, `+${fmt(gain)}`, 'ec-float-mini');
       fx.burst(x, y, { count: 3, power: 0.6 });
       const ripple = document.createElement('span');
       ripple.className = 'ripple ripple-auto';
@@ -61,12 +113,20 @@ export default function ClickArea() {
 
   const handleClick = (e) => {
     const gain = click();
-    const boost = boostEndsAt > Date.now() ? boostMult : 1;
+    const boosted = boostEndsAt > Date.now();
     playClick();
 
     // Effets visuels
-    fx.burst(e.clientX, e.clientY, { count: boost > 1 ? 22 : 14, power: boost > 1 ? 1.4 : 1 });
-    fx.float(e.clientX, e.clientY - 20, `+${fmt(gain)}`);
+    fx.burst(e.clientX, e.clientY, {
+      count: boosted ? 22 : 14,
+      power: boosted ? 1.4 : 1,
+    });
+    fx.float(
+      e.clientX,
+      e.clientY - 20,
+      `+${fmt(gain)}`,
+      boosted ? 'ec-float-frenzy' : ''
+    );
 
     // Onde de choc sur la pièce
     const coin = coinRef.current;
@@ -87,43 +147,69 @@ export default function ClickArea() {
   const boosted = boostEndsAt > Date.now();
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex w-full flex-1 select-none items-center justify-center overflow-hidden py-6 lg:min-h-[300px]"
+    <section
+      ref={sectionRef}
+      className={`relative flex w-full flex-1 select-none flex-col items-center justify-center overflow-hidden py-6 lg:min-h-[300px]${
+        stormed ? ' ec-shadow-mode' : ''
+      }`}
     >
-      {/* Halo lumineux derrière le logo (couleur du skin) */}
-      <div className="pointer-events-none absolute h-72 w-72 lg:h-96 lg:w-96">
+      {/* Lueur qui suit la souris (souris fine uniquement) */}
+      <span className="ec-mouse-glow" ref={orbRef} aria-hidden="true" />
+
+      {/* Halo lumineux derrière la pièce (couleur du skin). La respiration
+          anime le wrapper : le blur interne reste dans sa couche GPU. */}
+      <div className="ec-halo-breathe pointer-events-none absolute h-72 w-72 lg:h-96 lg:w-96">
         <div
           className="halo-pulse absolute inset-0 rounded-full blur-3xl"
-          style={{ backgroundColor: skin.fx?.halo || 'rgba(251, 129, 19, 0.25)' }}
+          style={{
+            backgroundColor: skin.fx?.halo || 'rgba(251, 129, 19, 0.25)',
+          }}
         />
       </div>
 
-      <button
-        ref={coinRef}
-        onClick={handleClick}
-        aria-label={`Cliquer pour gagner ${fmt(clickPower)} EndoCraft`}
-        className={`coin relative h-60 w-60 cursor-pointer transition-transform duration-100 hover:scale-[1.03] active:scale-95 lg:h-80 lg:w-80 ${
-          boosted ? 'coin-boosted' : ''
+      {/* Flottement d'inactivité, frénésie et tempête se posent sur le
+          wrapper : le squish du clic (sur le bouton) n'est jamais
+          interrompu par une autre animation. */}
+      <div
+        className={`ec-coin-idle relative${boosted ? ' ec-coin-frenzy' : ''}${
+          stormed ? ' ec-coin-shadow' : ''
         }`}
       >
-        <img
-          src={skin.icon}
-          alt=""
-          draggable={false}
-          style={skin.imgFilter ? { filter: skin.imgFilter } : undefined}
-        />
-      </button>
+        <button
+          ref={coinRef}
+          onClick={handleClick}
+          aria-label={`Cliquer pour gagner ${fmt(clickPower)} EndoCraft`}
+          style={{ borderRadius: 9999 }}
+          className="coin focus-ring relative flex h-56 w-56 cursor-pointer items-center justify-center transition-transform duration-100 hover:scale-[1.03] sm:h-64 sm:w-64 lg:h-80 lg:w-80"
+        >
+          <img
+            src={skin.icon}
+            alt=""
+            draggable={false}
+            className={`h-40 w-40 sm:h-48 sm:w-48 lg:h-64 lg:w-64${
+              boosted ? ' coin-boosted' : ''
+            }`}
+            style={skin.imgFilter ? { filter: skin.imgFilter } : undefined}
+          />
+          {boosted && <span className="ec-sheen" aria-hidden="true" />}
+        </button>
+      </div>
+
+      {/* Pied de scène : puissance du clic et clics fantômes par seconde */}
+      <p className="relative mt-2 flex items-center gap-3 rounded-full border border-line/10 bg-void/30 px-4 py-1.5 text-2xs tabular-nums text-ink-2">
+        <span>👆 +{fmt(clickPower)} / clic</span>
+        {autoPerSec > 0 && <span>· 👻 {autoPerSec} clics/s</span>}
+      </p>
 
       <a
         href="https://github.com/GoatAndCow7/EndoClicker"
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute bottom-0 text-[10px] font-medium text-slate-500/80 transition-colors hover:text-slate-300"
+        className="absolute bottom-1.5 text-3xs font-medium text-ink-4 transition-colors hover:text-ink-2"
       >
         EndoClicker — basé sur le serveur EndoCraft par GoatAndCow · disponible
         sur GitHub
       </a>
-    </div>
+    </section>
   );
 }

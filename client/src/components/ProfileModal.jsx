@@ -15,11 +15,11 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 
 function ProfileStat({ icon, label, value }) {
   return (
-    <div className="rounded-xl bg-white/5 p-2.5 text-center">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+    <div className="stat-tile text-center">
+      <p className="text-3xs uppercase tracking-wider text-ink-4">
         {icon} {label}
       </p>
-      <p className="mt-0.5 text-sm font-extrabold text-ember-200">{value}</p>
+      <p className="stat-tile-value mt-0.5 text-sm font-extrabold">{value}</p>
     </div>
   );
 }
@@ -28,19 +28,19 @@ function CaseChip({ icon, name, rarity, emoji, desc, selected, onClick }) {
   const r = RARITIES[rarity] || RARITIES.commun;
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all hover:brightness-125 ${
-        selected ? 'ring-2 ring-white/40' : ''
+      className={`badge-rarity rarity-${rarity} focus-ring cursor-pointer transition-transform hover:brightness-125 ${
+        selected ? 'ring-2 ring-accent/60' : ''
       }`}
-      style={{ borderColor: r.color, background: `${r.color}15`, color: r.color }}
       title={`${name} — ${r.label} (cliquez pour détails)`}
     >
       {emoji ? (
-        <span>{emoji}</span>
+        <span aria-hidden="true">{emoji}</span>
       ) : (
-        <img src={icon} alt="" className="pixelated h-5 w-5" />
+        <img src={icon} alt="" className="pixelated h-4 w-4" />
       )}
-      <span className="text-slate-100">{name}</span>
+      <span className="normal-case tracking-normal text-ink-2">{name}</span>
     </button>
   );
 }
@@ -60,84 +60,125 @@ export default function ProfileModal({ pseudo, onClose }) {
     };
   }, [pseudo]);
 
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const equippedTag =
+    profile?.equippedTag && TAG_BY_ID[profile.equippedTag]
+      ? TAG_BY_ID[profile.equippedTag]
+      : null;
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" onClick={onClose}>
       {error && (
-        <div className="panel p-6 text-center text-sm text-red-300" onClick={(e) => e.stopPropagation()}>
-          {error}
-          <button onClick={onClose} className="btn-ghost mt-3 block w-full text-xs">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Erreur du profil"
+          className="modal-card max-w-sm p-6 text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm font-semibold text-danger-bright">{error}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost focus-ring mt-4 h-11 w-full text-sm md:h-10"
+          >
             Fermer
           </button>
         </div>
       )}
-      {!profile && !error && (
-        <div className="flex items-center justify-center p-10">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-ember-500 border-t-transparent" />
-        </div>
-      )}
+      {!profile && !error && <div className="spinner" />}
 
       {profile && (
         <div
-          className="panel animate-pop relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Profil de ${profile.pseudo}`}
+          className="modal-card max-w-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* En-tête */}
-          <div className="flex items-center gap-4 border-b border-white/10 p-4">
+          {/* En-tête : avatar, pseudo, tag équipé, rang */}
+          <div className="modal-head">
             <img
               src={`https://mc-heads.net/avatar/${encodeURIComponent(profile.pseudo)}/64`}
               alt=""
-              className="pixelated h-16 w-16 rounded-lg bg-black/40 ring-2 ring-white/15"
+              className="pixelated h-16 w-16 rounded-lg bg-void/40 ring-2 ring-line/15"
             />
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-xl font-extrabold">
-                {profile.pseudo}
-                {profile.equippedTag && TAG_BY_ID[profile.equippedTag] && (
-                  <span
-                    className="ml-2 rounded-full px-2 py-0.5 align-middle text-xs font-extrabold"
-                    style={{
-                      color: RARITIES[TAG_BY_ID[profile.equippedTag].rarity].color,
-                      background: `${RARITIES[TAG_BY_ID[profile.equippedTag].rarity].color}20`,
-                    }}
-                  >
-                    {TAG_BY_ID[profile.equippedTag].label}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="truncate text-base font-extrabold text-ink">
+                  {profile.pseudo}
+                </span>
+                {equippedTag && (
+                  <span className={`badge-rarity rarity-${equippedTag.rarity}`}>
+                    {equippedTag.label}
                   </span>
                 )}
                 {profile.renaissances > 0 && (
                   <span
-                    className="ml-2 rounded-full bg-ember-600/25 px-2 py-0.5 align-middle text-xs font-extrabold text-ember-300"
+                    className="chip chip-accent"
                     title="Renaissances"
                   >
                     🔥 ×{profile.renaissances}
                   </span>
                 )}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {profile.rank
-                  ? `${profile.rank <= 3 ? MEDALS[profile.rank - 1] : `#${profile.rank}`} au classement`
-                  : 'Pas encore classé'}
-                {' • '}inscrit le{' '}
-                {new Date(profile.createdAt).toLocaleDateString('fr-FR')}
-              </p>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {profile.rank ? (
+                  <span className="chip chip-accent">
+                    {profile.rank <= 3
+                      ? MEDALS[profile.rank - 1]
+                      : `#${profile.rank}`}{' '}
+                    au classement
+                  </span>
+                ) : (
+                  <span className="chip">Pas encore classé</span>
+                )}
+                <span className="text-3xs text-ink-4">
+                  inscrit le{' '}
+                  {new Date(profile.createdAt).toLocaleDateString('fr-FR')}
+                </span>
+              </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-full p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+              className="modal-x"
               aria-label="Fermer"
             >
               ✕
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <div className="modal-body space-y-4">
             {/* Stats principales */}
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              <ProfileStat icon="💰" label="Récolté" value={fmt(profile.totalEndocraft)} />
-              <ProfileStat icon="👆" label="Clics" value={fmtInt(profile.clicks)} />
-              <ProfileStat icon="⏱️" label="Jeu" value={fmtDuration(profile.playMs)} />
-              <ProfileStat icon="🎁" label="Cases" value={fmtInt(profile.casesOpened)} />
+              <ProfileStat
+                icon="💰"
+                label="Récolté"
+                value={fmt(profile.totalEndocraft)}
+              />
+              <ProfileStat
+                icon="👆"
+                label="Clics"
+                value={fmtInt(profile.clicks)}
+              />
+              <ProfileStat
+                icon="⏱️"
+                label="Jeu"
+                value={fmtDuration(profile.playMs)}
+              />
+              <ProfileStat
+                icon="🎁"
+                label="Caisses"
+                value={fmtInt(profile.casesOpened)}
+              />
               <ProfileStat
                 icon="🌟"
                 label="Légend."
@@ -149,31 +190,31 @@ export default function ProfileModal({ pseudo, onClose }) {
               {/* Équipe recrutée */}
               {profile.staff.length > 0 && (
                 <section>
-                  <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-ember-300">
+                  <h4 className="section-title mb-2">
                     🤝 Équipe ({profile.staff.length}/{STAFF.length})
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {STAFF.filter((m) => profile.staff.includes(m.id)).map((m) => (
-                      <img
-                        key={m.id}
-                        src={m.icon}
-                        alt={m.pseudo}
-                        title={`${m.pseudo} — ${m.role}`}
-                        className="pixelated h-9 w-9 rounded-lg bg-black/40 ring-1 ring-white/10"
-                      />
-                    ))}
+                    {STAFF.filter((m) => profile.staff.includes(m.id)).map(
+                      (m) => (
+                        <img
+                          key={m.id}
+                          src={m.icon}
+                          alt={m.pseudo}
+                          title={`${m.pseudo} — ${m.role}`}
+                          className="pixelated h-10 w-10 rounded-lg bg-void/40 ring-1 ring-line/10"
+                        />
+                      )
+                    )}
                   </div>
                 </section>
               )}
 
-              {/* Butin de cases */}
+              {/* Butin de caisses */}
               <section>
-                <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-ember-300">
-                  🎁 Butin de cases
-                </h4>
+                <h4 className="section-title mb-2">🎁 Butin de caisses</h4>
                 {(() => {
                   const items = [];
-                  // Upgrades exclusives possédées
+                  // Exclusives possédées
                   for (const u of CASE_UPGRADES) {
                     if (profile.upgrades.includes(u.id)) {
                       items.push(
@@ -184,7 +225,19 @@ export default function ProfileModal({ pseudo, onClose }) {
                           rarity={u.rarity}
                           desc={u.desc}
                           selected={selectedLoot?.id === u.id}
-                          onClick={() => setSelectedLoot(selectedLoot?.id === u.id ? null : { id: u.id, icon: u.icon, name: u.name, rarity: u.rarity, desc: u.desc })}
+                          onClick={() =>
+                            setSelectedLoot(
+                              selectedLoot?.id === u.id
+                                ? null
+                                : {
+                                    id: u.id,
+                                    icon: u.icon,
+                                    name: u.name,
+                                    rarity: u.rarity,
+                                    desc: u.desc,
+                                  }
+                            )
+                          }
                         />
                       );
                     }
@@ -201,7 +254,19 @@ export default function ProfileModal({ pseudo, onClose }) {
                           emoji="💗"
                           desc={sk.desc}
                           selected={selectedLoot?.id === id}
-                          onClick={() => setSelectedLoot(selectedLoot?.id === id ? null : { id, name: sk.name, rarity: 'legendaire', emoji: '💗', desc: sk.desc })}
+                          onClick={() =>
+                            setSelectedLoot(
+                              selectedLoot?.id === id
+                                ? null
+                                : {
+                                    id,
+                                    name: sk.name,
+                                    rarity: 'legendaire',
+                                    emoji: '💗',
+                                    desc: sk.desc,
+                                  }
+                            )
+                          }
                         />
                       );
                     }
@@ -218,7 +283,19 @@ export default function ProfileModal({ pseudo, onClose }) {
                           emoji="🏷️"
                           desc="Tag de prestige affiché à côté du pseudo au classement et sur le profil."
                           selected={selectedLoot?.id === id}
-                          onClick={() => setSelectedLoot(selectedLoot?.id === id ? null : { id, name: tag.label, rarity: tag.rarity, emoji: '🏷️', desc: 'Tag de prestige affiché à côté du pseudo au classement et sur le profil.' })}
+                          onClick={() =>
+                            setSelectedLoot(
+                              selectedLoot?.id === id
+                                ? null
+                                : {
+                                    id,
+                                    name: tag.label,
+                                    rarity: tag.rarity,
+                                    emoji: '🏷️',
+                                    desc: 'Tag de prestige affiché à côté du pseudo au classement et sur le profil.',
+                                  }
+                            )
+                          }
                         />
                       );
                     }
@@ -228,11 +305,7 @@ export default function ProfileModal({ pseudo, onClose }) {
                       <div className="flex flex-wrap gap-1.5">{items}</div>
                       {selectedLoot && (
                         <div
-                          className="animate-pop mt-2 flex items-center gap-3 rounded-xl border p-3"
-                          style={{
-                            borderColor: RARITIES[selectedLoot.rarity]?.color,
-                            background: `${RARITIES[selectedLoot.rarity]?.color}0d`,
-                          }}
+                          className={`rarity-card rarity-${selectedLoot.rarity} ec-reveal-in mt-2 flex items-center gap-3 p-3`}
                         >
                           {selectedLoot.icon ? (
                             <img
@@ -241,21 +314,20 @@ export default function ProfileModal({ pseudo, onClose }) {
                               className="pixelated h-10 w-10 shrink-0"
                             />
                           ) : (
-                            <span className="shrink-0 text-3xl">
+                            <span className="shrink-0 text-3xl" aria-hidden="true">
                               {selectedLoot.emoji}
                             </span>
                           )}
                           <div className="min-w-0">
-                            <p className="text-sm font-extrabold text-slate-100">
+                            <p className="text-sm font-extrabold text-ink">
                               {selectedLoot.name}
                               <span
-                                className="ml-2 text-[10px] font-bold uppercase tracking-wider"
-                                style={{ color: RARITIES[selectedLoot.rarity]?.color }}
+                                className={`rarity-text rarity-${selectedLoot.rarity} ml-2 text-3xs font-bold uppercase tracking-widest`}
                               >
                                 {RARITIES[selectedLoot.rarity]?.label}
                               </span>
                             </p>
-                            <p className="mt-0.5 text-[11px] leading-snug text-slate-300">
+                            <p className="mt-0.5 text-2xs leading-snug text-ink-2">
                               {selectedLoot.desc}
                             </p>
                           </div>
@@ -263,9 +335,10 @@ export default function ProfileModal({ pseudo, onClose }) {
                       )}
                     </>
                   ) : (
-                    <p className="text-[11px] italic text-slate-500">
-                      Aucun trésor de case pour l’instant. La chance n’a pas encore tourné.
-                    </p>
+                    <div className="empty-state text-3xs">
+                      Aucun trésor de caisse pour l’instant. La chance n’a pas
+                      encore tourné.
+                    </div>
                   );
                 })()}
               </section>
@@ -274,31 +347,31 @@ export default function ProfileModal({ pseudo, onClose }) {
             {/* Générateurs */}
             {Object.keys(profile.generators).length > 0 && (
               <section>
-                <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-ember-300">
-                  🪓 Générateurs
-                </h4>
+                <h4 className="section-title mb-2">🪓 Générateurs</h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {GENERATORS.filter((g) => (profile.generators[g.id] || 0) > 0).map(
-                    (g) => (
-                      <span
-                        key={g.id}
-                        title={`${g.name} ×${profile.generators[g.id]}`}
-                        className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-black/40 ring-1 ring-white/10"
-                      >
-                        <img src={g.icon} alt={g.name} className="pixelated h-8 w-8" />
-                        <span className="absolute -bottom-1.5 -right-1.5 rounded-full bg-ember-600 px-1 text-[9px] font-extrabold text-white">
-                          {profile.generators[g.id]}
-                        </span>
-                      </span>
-                    )
-                  )}
+                  {GENERATORS.filter(
+                    (g) => (profile.generators[g.id] || 0) > 0
+                  ).map((g) => (
+                    <span
+                      key={g.id}
+                      title={`${g.name} ×${profile.generators[g.id]}`}
+                      className="chip chip-accent"
+                    >
+                      <img
+                        src={g.icon}
+                        alt={g.name}
+                        className="pixelated h-6 w-6"
+                      />
+                      <b>×{profile.generators[g.id]}</b>
+                    </span>
+                  ))}
                 </div>
               </section>
             )}
 
             {/* Succès */}
             <section>
-              <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-ember-300">
+              <h4 className="section-title mb-2">
                 🏅 Succès ({profile.achievements.length}/{ACHIEVEMENTS.length})
               </h4>
               <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-12">
@@ -308,21 +381,23 @@ export default function ProfileModal({ pseudo, onClose }) {
                     <span
                       key={a.id}
                       title={done ? `${a.name} — ${a.desc}` : a.desc}
+                      aria-label={done ? a.name : 'Succès verrouillé'}
                       className={`flex aspect-square items-center justify-center rounded-lg text-lg ${
                         done
-                          ? 'bg-ember-950/40 ring-1 ring-ember-500/40'
-                          : 'bg-black/30 opacity-40 grayscale'
+                          ? 'bg-accent-overlay/40 ring-1 ring-accent/40'
+                          : 'bg-void/30 opacity-40 grayscale'
                       }`}
                     >
-                      {done ? a.icon : '🔒'}
+                      <span aria-hidden="true">{done ? a.icon : '🔒'}</span>
                     </span>
                   );
                 })}
               </div>
             </section>
 
-            <p className="text-center text-[10px] text-slate-500">
-              Dernière activité : {new Date(profile.updatedAt).toLocaleString('fr-FR')}
+            <p className="text-center text-3xs text-ink-4">
+              Dernière activité :{' '}
+              {new Date(profile.updatedAt).toLocaleString('fr-FR')}
             </p>
           </div>
         </div>

@@ -7,11 +7,12 @@ import {
   ACHIEVEMENTS,
   STAFF,
   STAFF_BY_ID,
-  COIN_SKINS,
   COIN_SKIN_BY_ID,
   RENAISSANCE,
   getRenaissanceThreshold,
+  getRenaissanceMult,
   COST_FACTOR,
+  CLICK_PRODUCTION_SHARE,
   APPLE,
   APPLE_REWARDS,
   APPLE_TYPES,
@@ -20,19 +21,21 @@ import {
   CRYSTAL_PRODUCTION_SECONDS,
   CURSED_DELAY_MS,
   CURSED_BANK_PERCENT,
+  CURSED_CAP_SECONDS,
   DAILY_QUESTS,
   CASES,
-  CASE_UPGRADES,
-  TAG_BY_ID,
+  CASE_DUPLICATE_REFUND,
 } from './constants';
 import { api, getToken, decodePseudo } from '../api/client';
 import { playPurchase, playAchievement, playApple } from './audio';
+import { fmt } from './format';
 
-const SAVE_KEY = 'endoclicker_save_v1';
+const SAVE_KEY = 'endoclicker_save';
+const SAVE_VERSION = 2; // V2 = reset mondial : les sauvegardes v1 sont ignorées
 const AUTOSAVE_MS = 5_000;
 const CLOUD_SYNC_MS = 60_000;
-const OFFLINE_CAP_MS = 8 * 3600_000; // 8 h
-const OFFLINE_EFFICIENCY = 0.5;
+const OFFLINE_CAP_MS = 10 * 3600_000; // 10 h (étendu par Fl0ryoz & co, 18 h max)
+const OFFLINE_EFFICIENCY = 0.6; // 60 % de base (jusqu'à 100 % avec le staff)
 
 // ---------- Calculs ----------
 
@@ -94,7 +97,7 @@ export function getProduction(state) {
   const genMult = {};
   let globalMult = 1;
   for (const u of UPGRADES) {
-    if (!state.upgrades.includes(u.id)) continue;
+    if (!state.upgrades || !state.upgrades.includes(u.id)) continue;
     if (u.kind === 'gen') genMult[u.genId] = (genMult[u.genId] || 1) * u.mult;
     if (u.kind === 'global') globalMult *= u.mult;
   }
@@ -102,10 +105,9 @@ export function getProduction(state) {
   for (const g of GENERATORS) {
     rate += (state.generators[g.id] || 0) * g.baseRate * (genMult[g.id] || 1);
   }
-  // Bonus permanent des Renaissances (+15 % chacune, additif) et
+  // Bonus permanent des Renaissances B(n) = (1 + 0,25n) × 1,15^n, et
   // Résonance de l'EndoCrystal (×1,5 si équipé)
-  const renaissanceMult =
-    1 + (state.renaissances || 0) * RENAISSANCE.multPerRenaissance;
+  const renaissanceMult = getRenaissanceMult(state.renaissances || 0);
   const crystalMult =
     equippedPerk(state)?.id === 'productionBoost' ? 1.5 : 1;
   return rate * globalMult * renaissanceMult * crystalMult * getStaffMults(state).production;
@@ -129,8 +131,13 @@ export function getClickPower(state) {
   for (const u of UPGRADES) {
     if (u.kind === 'click' && state.upgrades.includes(u.id)) mult *= u.mult;
   }
-  // Le clic profite aussi de 5 % de la production passive
-  return (mult + getProduction(state) * 0.05) * getStaffMults(state).click;
+  // Les pioches profitent des multiplicateurs staff/cases ; la part issue
+  // de la production en est EXCLUE — sinon le clic devient la stratégie
+  // dominante à 10 clics/s + frénésie ×7.
+  return (
+    mult * getStaffMults(state).click +
+    getProduction(state) * CLICK_PRODUCTION_SHARE
+  );
 }
 
 function computeStats(state) {
@@ -186,13 +193,14 @@ function initialState() {
     applesClicked: 0,
     applesByType: {}, // pommes attrapées par type { doree, orage, ombre, cristal, maudite }
     shadowMinisCaught: 0, // mini-pommes attrapées pendant les tempêtes
-    shadowStorm: null, // { endsAt } pendant la tempête de clics
+    shadowStorm: null, // { endsAt, baseBank, minisSpawned } pendant la tempête
     applesRained: 0, // pommes attrapées pendant les pluies
     rainFrenzyCatches: 0, // pommes de pluie attrapées pendant une frénésie
     maxOfflineGain: 0, // plus gros gain hors-ligne encaissé d'un coup
     titleClicks: 0, // clics sur le titre (secret)
     frenziesStarted: 0, // frénésies déclenchées (à vie)
-    quests: null, // quêtes du jour : { date, list, start, bonusClaimed }
+    pendingCursedAt: 0, // pomme maudite en cours de « doute » (persisté)
+    quests: null, // quêtes du jour : { date, list, start, reward, bonusClaimed }
     questsClaimed: 0, // quêtes réclamées (à vie)
     casesOpened: 0, // caisses ouvertes (à vie)
     caseLegendaryDrops: 0, // drops légendaires obtenus
@@ -254,6 +262,13 @@ function generateDailyQuests(s) {
   const pseudo = decodePseudo(getToken()) || 'invité';
   const rand = seededRandom(`${pseudo}|${date}`);
 
+  // La récompense est FIGÉE à la génération : impossible de gonfler sa
+  // production dans la journée puis de tout réclamer le soir.
+  const reward = Math.max(
+    5000,
+    Math.round(getProduction(s) * DAILY_QUESTS.rewardSeconds)
+  );
+
   // 3 types distincts tirés du pool
   const pool = [...DAILY_QUESTS.pool];
   const list = [];
@@ -262,15 +277,15 @@ function generateDailyQuests(s) {
     const q = pool.splice(idx, 1)[0];
     let target;
     if (q.type === 'earn') {
-      // 10 à 20 minutes de production actuelle
+      // 15 à 30 minutes de production du matin
       const rate = getProduction(s);
-      target = Math.max(10_000, Math.round(rate * (600 + rand() * 600)));
+      target = Math.max(10_000, Math.round(rate * (900 + rand() * 900)));
     } else {
       target = Math.round(q.min + rand() * (q.max - q.min));
     }
-    list.push({ type: q.type, target, claimed: false });
+    list.push({ type: q.type, target, claimed: false, reward });
   }
-  return { date, list, start: questSnapshots(s), bonusClaimed: false };
+  return { date, list, start: questSnapshots(s), reward, bonusClaimed: false };
 }
 
 // Progression d'une quête = delta du compteur concerné depuis le début du jour
@@ -300,6 +315,48 @@ function questProgress(s, type) {
   }
 }
 
+// Nettoie un état chargé (localStorage, cloud, admin) : aucune valeur
+// hostile (NaN, Infinity, types cassés) ne doit atteindre la boucle de jeu.
+function sanitizeLoaded(raw) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0);
+  const arr = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+  const obj = (v) =>
+    v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const gens = {};
+  for (const [k, v] of Object.entries(obj(raw.generators))) {
+    const n = Math.floor(num(v));
+    if (n > 0) gens[k] = n;
+  }
+  const apples = {};
+  for (const [k, v] of Object.entries(obj(raw.applesByType))) {
+    apples[k] = Math.floor(num(v));
+  }
+  return {
+    ...raw,
+    endocraft: num(raw.endocraft),
+    totalEndocraft: num(raw.totalEndocraft),
+    lifetimeEndocraft: num(raw.lifetimeEndocraft),
+    clicks: Math.floor(num(raw.clicks)),
+    generators: gens,
+    upgrades: arr(raw.upgrades),
+    staff: arr(raw.staff),
+    cosmetics: arr(raw.cosmetics),
+    achievements: arr(raw.achievements),
+    tags: arr(raw.tags),
+    equippedCoin: typeof raw.equippedCoin === 'string' ? raw.equippedCoin : 'default',
+    equippedTag: typeof raw.equippedTag === 'string' ? raw.equippedTag : null,
+    applesByType: apples,
+    boostMult: num(raw.boostMult) || 1,
+    rev: Math.floor(num(raw.rev)),
+    lastRenaissanceLifetime: num(raw.lastRenaissanceLifetime),
+    pendingCursedAt: num(raw.pendingCursedAt),
+    quests:
+      raw.quests && typeof raw.quests === 'object' && Array.isArray(raw.quests.list)
+        ? raw.quests
+        : null,
+  };
+}
+
 export const useGame = create((set, get) => ({
   ...initialState(),
 
@@ -308,7 +365,7 @@ export const useGame = create((set, get) => ({
   nextAppleAt: Date.now() + APPLE.minDelayMs,
   appleRain: null, // { endsAt, spawned } quand la pluie est active
   nextRainSpawnAt: 0,
-  rainApples: [], // [{ id, x, fallMs, spawnedAt }]
+  rainApples: [], // [{ id, x, fallMs, spawnedAt, mini? }]
   // Préférence d'affichage : 'auto' (heure réelle) | 'day' | 'night'
   dayNightPref: localStorage.getItem('endoclicker_daynight') || 'auto',
   toasts: [],
@@ -331,24 +388,35 @@ export const useGame = create((set, get) => ({
       clicks: s.clicks + 1,
     });
 
-    // Tempête de clics active : chaque clic lâche des mini-pommes
+    // Tempête de clics active : chaque clic lâche des mini-pommes,
+    // dans la limite du plafond de la tempête.
     if (s.shadowStorm && s.shadowStorm.endsAt > Date.now()) {
-      const [min, max] = SHADOW_STORM.minisPerClick;
-      const count = min + Math.floor(Math.random() * (max - min + 1));
-      const now = Date.now();
-      const minis = [];
-      for (let i = 0; i < count; i++) {
-        minis.push({
-          id: now + i + Math.random(),
-          x: 5 + Math.random() * 90,
-          fallMs:
-            APPLE_RAIN.fallMinMs +
-            Math.random() * (APPLE_RAIN.fallMaxMs - APPLE_RAIN.fallMinMs),
-          spawnedAt: now,
-          mini: true,
+      const spawned = s.shadowStorm.minisSpawned || 0;
+      const remaining = SHADOW_STORM.maxMinisPerStorm - spawned;
+      if (remaining > 0) {
+        const [min, max] = SHADOW_STORM.minisPerClick;
+        const count = Math.min(
+          min + Math.floor(Math.random() * (max - min + 1)),
+          remaining
+        );
+        const now = Date.now();
+        const minis = [];
+        for (let i = 0; i < count; i++) {
+          minis.push({
+            id: now + i + Math.random(),
+            x: 4 + Math.random() * 88,
+            fallMs:
+              APPLE_RAIN.fallMinMs +
+              Math.random() * (APPLE_RAIN.fallMaxMs - APPLE_RAIN.fallMinMs),
+            spawnedAt: now,
+            mini: true,
+          });
+        }
+        set({
+          rainApples: [...s.rainApples, ...minis],
+          shadowStorm: { ...s.shadowStorm, minisSpawned: spawned + count },
         });
       }
-      set({ rainApples: [...s.rainApples, ...minis] });
     }
 
     get().checkAchievements();
@@ -358,13 +426,16 @@ export const useGame = create((set, get) => ({
   // ---------- Achats ----------
   buyGenerator(id, amount = 1) {
     const s = get();
+    const n = Math.floor(Number(amount));
     const gen = GENERATOR_BY_ID[id];
+    if (!gen || !Number.isFinite(n) || n < 1) return false;
     const owned = s.generators[id] || 0;
-    const cost = generatorsCost(gen, owned, amount, getStaffMults(s).genCost);
-    if (s.endocraft < cost) return false;
+    const cost = generatorsCost(gen, owned, n, getStaffMults(s).genCost);
+    // Garde inversé : NaN/Infinity ne passent JAMAIS un achat
+    if (!(s.endocraft >= cost)) return false;
     set({
       endocraft: s.endocraft - cost,
-      generators: { ...s.generators, [id]: owned + amount },
+      generators: { ...s.generators, [id]: owned + n },
     });
     playPurchase();
     get().checkAchievements();
@@ -374,7 +445,7 @@ export const useGame = create((set, get) => ({
   buyUpgrade(id) {
     const s = get();
     const up = UPGRADE_BY_ID[id];
-    if (!up || s.upgrades.includes(id) || s.endocraft < up.cost) return false;
+    if (!up || s.upgrades.includes(id) || !(s.endocraft >= up.cost)) return false;
     if (up.req && (s.generators[up.req.genId] || 0) < up.req.count) return false;
     // Les améliorations d'équipe exigent que le membre soit recruté
     if (up.staffId && !(s.staff || []).includes(up.staffId)) return false;
@@ -391,7 +462,7 @@ export const useGame = create((set, get) => ({
   buyStaff(id) {
     const s = get();
     const member = STAFF_BY_ID[id];
-    if (!member || s.staff.includes(id) || s.endocraft < member.cost) return false;
+    if (!member || s.staff.includes(id) || !(s.endocraft >= member.cost)) return false;
     set({
       endocraft: s.endocraft - member.cost,
       staff: [...s.staff, id],
@@ -410,7 +481,7 @@ export const useGame = create((set, get) => ({
   buyCosmetic(id) {
     const s = get();
     const skin = COIN_SKIN_BY_ID[id];
-    if (!skin || skin.cost === 0 || s.cosmetics.includes(id) || s.endocraft < skin.cost)
+    if (!skin || skin.cost === 0 || s.cosmetics.includes(id) || !(s.endocraft >= skin.cost))
       return false;
     set({
       endocraft: s.endocraft - skin.cost,
@@ -427,7 +498,10 @@ export const useGame = create((set, get) => ({
     const s = get();
     const skin = COIN_SKIN_BY_ID[id];
     if (!skin) return;
-    if (skin.cost > 0 && !s.cosmetics.includes(id)) return;
+    // Seul le skin de base est gratuit — les exclusives de caisse
+    // (EndoCrystal) doivent réellement être possédées.
+    const owned = id === 'default' || s.cosmetics.includes(id);
+    if (!owned) return;
     set({ equippedCoin: id });
   },
 
@@ -443,10 +517,8 @@ export const useGame = create((set, get) => ({
     if (!q || q.claimed) return false;
     if (questProgress(s, q.type) < q.target) return false;
 
-    const reward = Math.max(
-      1000,
-      Math.round(getProduction(s) * DAILY_QUESTS.rewardSeconds)
-    );
+    // Récompense figée à la génération des quêtes (anti-exploit)
+    const reward = q.reward ?? 5000;
     const list = [...s.quests.list];
     list[i] = { ...q, claimed: true };
     set({
@@ -467,9 +539,7 @@ export const useGame = create((set, get) => ({
     if (!s.quests || s.quests.bonusClaimed) return false;
     if (!s.quests.list.every((q) => q.claimed)) return false;
 
-    const bonus =
-      Math.max(1000, Math.round(getProduction(s) * DAILY_QUESTS.rewardSeconds)) *
-      DAILY_QUESTS.bonusMult;
+    const bonus = (s.quests.reward ?? 5000) * DAILY_QUESTS.bonusMult;
     set({
       quests: { ...s.quests, bonusClaimed: true },
       endocraft: s.endocraft + bonus,
@@ -477,18 +547,19 @@ export const useGame = create((set, get) => ({
       lifetimeEndocraft: s.lifetimeEndocraft + bonus,
     });
     playAchievement();
-    get().addToast('🏆', 'Journée parfaite !', `Bonus ×3 : +${fmt(bonus)} EndoCraft.`);
+    get().addToast('🏆', 'Journée parfaite !', `Bonus ×${DAILY_QUESTS.bonusMult} : +${fmt(bonus)} EndoCraft.`);
     get().checkAchievements();
     return true;
   },
 
   // ---------- Cases (ouverture à la CS:GO) ----------
   // Tire un drop, l'applique immédiatement et le retourne pour l'animation.
-  // Un doublon d'upgrade exclusive est converti en cash (2× le prix).
+  // Un doublon d'upgrade/skin/tag exclusif est remboursé en cash
+  // (15-25 % du prix de la caisse selon la rareté).
   openCase(caseId) {
     const s = get();
     const box = CASES.find((c) => c.id === caseId);
-    if (!box || s.endocraft < box.cost) return null;
+    if (!box || !(s.endocraft >= box.cost)) return null;
 
     // Tirage pondéré
     const total = box.drops.reduce((a, d) => a + d.weight, 0);
@@ -506,37 +577,38 @@ export const useGame = create((set, get) => ({
       endocraft: s.endocraft - box.cost,
       casesOpened: s.casesOpened + 1,
     };
+    const credit = (amount) => {
+      patch.endocraft += amount;
+      patch.totalEndocraft = (patch.totalEndocraft ?? s.totalEndocraft) + amount;
+      patch.lifetimeEndocraft =
+        (patch.lifetimeEndocraft ?? s.lifetimeEndocraft) + amount;
+    };
+    // Remboursement d'un doublon (upgrade/skin/tag déjà possédé)
+    const refundDuplicate = (d) => {
+      const refund = Math.max(
+        1000,
+        Math.round(box.cost * (CASE_DUPLICATE_REFUND[d.rarity] ?? 0.2))
+      );
+      credit(refund);
+      return { ...d, duplicate: true, duplicateCash: refund };
+    };
 
     // Application du prix
     if (drop.type === 'cash') {
-      const gain = Math.max(1000, box.cost * drop.percent);
-      patch.endocraft += gain;
-      patch.totalEndocraft = s.totalEndocraft + gain;
-      patch.lifetimeEndocraft = s.lifetimeEndocraft + gain;
+      credit(Math.max(1000, box.cost * drop.percent));
     } else if (drop.type === 'nothing') {
       // Rien du tout — le vrai rembobinage
     } else if (drop.type === 'bank') {
       // Bonus immédiat : % de la banque, plafonné à 3× le prix de la caisse
       // (sinon les grosses banques rendent les cases gratuites)
-      const gain = Math.max(
-        50,
-        Math.min(s.endocraft * drop.bankPercent, box.cost * 3)
-      );
-      patch.endocraft += gain;
-      patch.totalEndocraft = s.totalEndocraft + gain;
-      patch.lifetimeEndocraft = s.lifetimeEndocraft + gain;
+      credit(Math.max(50, Math.min(s.endocraft * drop.bankPercent, box.cost * 3)));
     } else if (drop.type === 'frenzy') {
-      patch.boostMult = 7;
-      patch.boostEndsAt = Date.now() + drop.durationMs;
-      patch.frenziesStarted = s.frenziesStarted + 1;
+      get().applyBoost(7, drop.durationMs);
     } else if (drop.type === 'rain') {
-      patch.totalEndocraft = s.totalEndocraft;
-      patch.lifetimeEndocraft = s.lifetimeEndocraft;
+      get().startAppleRain();
     } else if (drop.type === 'upgrade') {
-      const alreadyOwned = s.upgrades.includes(drop.upgradeId);
-      if (alreadyOwned) {
-        // Doublon → rien du tout
-        drop = { ...drop, duplicate: true };
+      if (s.upgrades.includes(drop.upgradeId)) {
+        drop = refundDuplicate(drop);
       } else {
         patch.upgrades = [...s.upgrades, drop.upgradeId];
         if (drop.rarity === 'legendaire') {
@@ -544,9 +616,8 @@ export const useGame = create((set, get) => ({
         }
       }
     } else if (drop.type === 'skin') {
-      const alreadyOwned = s.cosmetics.includes(drop.skinId);
-      if (alreadyOwned) {
-        drop = { ...drop, duplicate: true };
+      if (s.cosmetics.includes(drop.skinId)) {
+        drop = refundDuplicate(drop);
       } else {
         patch.cosmetics = [...s.cosmetics, drop.skinId];
         if (drop.rarity === 'legendaire') {
@@ -554,9 +625,8 @@ export const useGame = create((set, get) => ({
         }
       }
     } else if (drop.type === 'tag') {
-      const alreadyOwned = (s.tags || []).includes(drop.tagId);
-      if (alreadyOwned) {
-        drop = { ...drop, duplicate: true };
+      if ((s.tags || []).includes(drop.tagId)) {
+        drop = refundDuplicate(drop);
       } else {
         patch.tags = [...(s.tags || []), drop.tagId];
         patch.equippedTag = drop.tagId; // équipé immédiatement
@@ -568,7 +638,6 @@ export const useGame = create((set, get) => ({
 
     set(patch);
     playPurchase();
-    if (drop.type === 'rain') get().startAppleRain();
     get().checkAchievements();
     return drop;
   },
@@ -580,18 +649,21 @@ export const useGame = create((set, get) => ({
   },
 
   // ---------- Renaissance ----------
-  // Tout repart à zéro (sauf succès, cosmétiques et stats) contre un
-  // multiplicateur de production permanent.
+  // Tout repart à zéro (sauf succès, cosmétiques, tags, exclusives de
+  // caisses et stats) contre un bonus de production permanent et les
+  // Braises du Phénix (de quoi redémarrer sans cliquer 200 fois).
   doRenaissance() {
     const s = get();
-    if (s.lifetimeEndocraft < getRenaissanceThreshold(s.renaissances)) return false;
+    const threshold = getRenaissanceThreshold(s.renaissances);
+    const lifetime = Number(s.lifetimeEndocraft);
+    if (!Number.isFinite(lifetime) || !(lifetime >= threshold)) return false;
     // Empêche les renaissances enchaînées : depuis la dernière renaissance,
-    // il faut re-farmer au moins le nouveau seuil. lastRenaissanceLifetime
-    // absent (vieille save) = 0, donc le check s'applique aussi.
-    if (s.renaissances > 0) {
-      const sinceLast = s.lifetimeEndocraft - (s.lastRenaissanceLifetime || 0);
-      if (sinceLast < getRenaissanceThreshold(s.renaissances)) return false;
-    }
+    // il faut re-farmer au moins le nouveau seuil.
+    const last = Number.isFinite(Number(s.lastRenaissanceLifetime))
+      ? Number(s.lastRenaissanceLifetime)
+      : 0;
+    if (s.renaissances > 0 && !(lifetime - last >= threshold)) return false;
+
     const newCount = s.renaissances + 1;
     // Les exclusives de cases (kind 'case') survivent à la Renaissance :
     // c'est ce qui justifie leur rareté et le prix des caisses.
@@ -599,27 +671,58 @@ export const useGame = create((set, get) => ({
       (u) => u.kind === 'case' && s.upgrades.includes(u.id)
     ).map((u) => u.id);
     set({
-      endocraft: 0,
+      // Braises du Phénix : pécule de départ, cumulé par renaissance.
+      // Versé en `endocraft` uniquement : il ne compte ni dans le total du
+      // cycle ni dans le compteur à vie → aucun enchaînement possible.
+      endocraft: newCount * RENAISSANCE.emberBankPerRenaissance,
       totalEndocraft: 0, // lifetimeEndocraft : jamais remis à zéro
       generators: {},
       upgrades: caseUpgrades,
       staff: [],
       renaissances: newCount,
-      lastRenaissanceLifetime: s.lifetimeEndocraft,
+      lastRenaissanceLifetime: lifetime,
       boostMult: 1,
       boostEndsAt: 0,
+      shadowStorm: null,
+      appleRain: null,
+      rainApples: [],
+      pendingCursedAt: 0,
     });
     get().addToast(
       '🔥',
       `Renaissance n°${newCount} !`,
-      `Production permanente +${Math.round(
-        newCount * RENAISSANCE.multPerRenaissance * 100
-      )} %. Bienvenue dans le cycle.`,
+      `Bonus permanent ×${getRenaissanceMult(newCount).toFixed(2)} — Braises du Phénix : +${fmt(
+        newCount * RENAISSANCE.emberBankPerRenaissance
+      )} EndoCraft pour repartir.`,
       7000
     );
     get().checkAchievements();
+    // Persiste AVANT de syncer : un crash ne peut pas annuler la renaissance
+    // ni laisser un état local périmé écraser le cloud.
+    get().saveLocal();
     get().cloudSync();
     return true;
+  },
+
+  // ---------- Frénésies ----------
+  // Source unique (pommes, caisses, admin) : deux frénésies qui se
+  // chevauchent prennent le max des deux, jamais l'écrasement de l'une
+  // par l'autre.
+  applyBoost(mult, durationMs) {
+    const s = get();
+    if (!Number.isFinite(mult) || mult <= 1) return;
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+    const now = Date.now();
+    const active = s.boostEndsAt > now;
+    // EndoBlaze équipé : frénésies +25 % de durée
+    durationMs *= equippedPerk(s)?.id === 'frenzyDuration' ? 1.25 : 1;
+    set({
+      boostMult: active ? Math.max(s.boostMult, mult) : mult,
+      boostEndsAt: active
+        ? Math.max(s.boostEndsAt, now + durationMs)
+        : now + durationMs,
+      frenziesStarted: s.frenziesStarted + 1,
+    });
   },
 
   // ---------- Événements en direct (SSE, déclenchés par un admin) ----------
@@ -631,11 +734,9 @@ export const useGame = create((set, get) => ({
   },
 
   adminFrenzy(mult, durationMs) {
-    set({
-      boostMult: mult,
-      boostEndsAt: Date.now() + durationMs,
-      frenziesStarted: get().frenziesStarted + 1,
-    });
+    if (!Number.isFinite(mult) || mult <= 1) return;
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+    get().applyBoost(mult, durationMs);
     get().addToast(
       '⚡',
       'Frénésie du staff !',
@@ -645,21 +746,26 @@ export const useGame = create((set, get) => ({
   },
 
   adminSpawnApple(type) {
+    // N'écrase pas une pomme déjà à l'écran (elle serait perdue sans
+    // compensation) et reporte le spawn naturel.
+    if (get().apple) return;
     const appleType = APPLE_TYPES[type] ? type : get().rollAppleType();
+    const now = Date.now();
     set({
       apple: {
-        id: Date.now(),
+        id: now,
         type: appleType,
-        x: 15 + Math.random() * 70,
-        y: 15 + Math.random() * 70,
-        expiresAt: Date.now() + APPLE.visibleMs,
+        x: 12 + Math.random() * 72,
+        y: 15 + Math.random() * 65,
+        expiresAt: now + APPLE.visibleMs,
       },
+      nextAppleAt: now + APPLE.intervalMinMs,
     });
     const def = APPLE_TYPES[appleType];
     get().addToast(
       def.icon,
       'Une pomme est apparue !',
-      `L’administration vous a envoyé ${def.name.includes('la') ? 'une' : 'une'} ${def.name.replace(/^Pomme (d'orange|de|d')?/, '').trim() || def.name} — attrapez-la vite !`,
+      `L’administration vous envoie une ${def.name.replace(/^Pomme /, '').trim() || def.name} — attrapez-la vite !`,
       5000
     );
   },
@@ -704,7 +810,7 @@ export const useGame = create((set, get) => ({
       applesClicked: s.applesClicked + 1,
       applesByType: {
         ...s.applesByType,
-        [appleType]: (s.applesByType?.[appleType] || 0) + 1,
+        [appleType]: Math.floor(Number(s.applesByType?.[appleType]) || 0) + 1,
       },
     });
     playApple();
@@ -721,24 +827,32 @@ export const useGame = create((set, get) => ({
           break;
         }
       }
+      // Une frénésie est déjà active ? Le tirage bascule sur le chanceux :
+      // jamais de frénésie gaspillée par écrasement.
+      if (reward === 'frenzy' && s.boostEndsAt > Date.now()) {
+        reward = 'lucky';
+      }
 
       if (reward === 'frenzy') {
-        const { mult } = APPLE_REWARDS.frenzy;
-        // EndoBlaze équipé : frénésie +25 % de durée
-        const durationMs =
-          APPLE_REWARDS.frenzy.durationMs *
-          (equippedPerk(s)?.id === 'frenzyDuration' ? 1.25 : 1);
-        set({
-          boostMult: mult,
-          boostEndsAt: Date.now() + durationMs,
-          frenziesStarted: s.frenziesStarted + 1,
-        });
+        const { mult, durationMs } = APPLE_REWARDS.frenzy;
+        get().applyBoost(mult, durationMs);
         get().addToast('🔥', 'Frénésie !', `Clics ×${mult} pendant 30 s`);
         get().checkAchievements();
       } else {
-        // EndoRoi équipé : dîme royale 15 % au lieu de 10 %
-        const bankPercent = equippedPerk(s)?.id === 'luckyBonus' ? 0.15 : 0.1;
-        const bonus = Math.max(25, get().endocraft * bankPercent);
+        // EndoRoi équipé : dîme royale 12 % au lieu de 10 %.
+        // Le gain est plafonné en secondes de production : un % de banque
+        // non bornu est une exponentielle autonome.
+        const bankPercent =
+          equippedPerk(s)?.id === 'luckyBonus'
+            ? 0.12
+            : APPLE_REWARDS.lucky.bankPercent;
+        const bonus = Math.max(
+          25,
+          Math.min(
+            get().endocraft * bankPercent,
+            getProduction(get()) * APPLE_REWARDS.lucky.capSeconds
+          )
+        );
         set({
           endocraft: get().endocraft + bonus,
           totalEndocraft: get().totalEndocraft + bonus,
@@ -766,9 +880,17 @@ export const useGame = create((set, get) => ({
       return { type: 'orage' };
     }
 
-    // --- Pomme d'ombre : tempête de clics ---
+    // --- Pomme d'ombre : tempête de clics (bornée) ---
     if (appleType === 'ombre') {
-      set({ shadowStorm: { endsAt: Date.now() + SHADOW_STORM.durationMs } });
+      set({
+        shadowStorm: {
+          endsAt: Date.now() + SHADOW_STORM.durationMs,
+          // La banque est FIGÉE au déclenchement : les mini-pommes ne
+          // composent plus sur une banque qu'elles gonflent elles-mêmes.
+          baseBank: s.endocraft,
+          minisSpawned: 0,
+        },
+      });
       get().addToast(
         '🌑',
         'Tempête de clics !',
@@ -779,7 +901,7 @@ export const useGame = create((set, get) => ({
       return { type: 'ombre' };
     }
 
-    // --- Pomme de cristal : 2 minutes de production immédiates ---
+    // --- Pomme de cristal : 3 minutes de production immédiates ---
     if (appleType === 'cristal') {
       const gain = Math.max(
         1000,
@@ -793,41 +915,62 @@ export const useGame = create((set, get) => ({
       get().addToast(
         '💎',
         'Gain temporel !',
-        `+${fmt(gain)} EndoCraft (2 minutes de production).`
+        `+${fmt(gain)} EndoCraft (3 minutes de production).`
       );
       get().checkAchievements();
       return { type: 'cristal', gain };
     }
 
-    // --- Pomme maudite : 5 s de doute… puis +20 % de banque ---
+    // --- Pomme maudite : 5 s de doute… puis +12 % de banque ---
+    // Le « doute » est PERSISTÉ : fermer l'onglet pendant les 5 s ne fait
+    // plus perdre la récompense.
     if (appleType === 'maudite') {
       get().addToast('💀', '…', 'Rien ne se passe. C’est inquiétant.', 4500);
-      setTimeout(() => {
-        const cur = get();
-        const bonus = Math.max(50, cur.endocraft * CURSED_BANK_PERCENT);
-        set({
-          endocraft: cur.endocraft + bonus,
-          totalEndocraft: cur.totalEndocraft + bonus,
-          lifetimeEndocraft: cur.lifetimeEndocraft + bonus,
-        });
-        get().addToast(
-          '💀',
-          'KendiiX l’avait touchée…',
-          `…et ça paie : +${Math.round(CURSED_BANK_PERCENT * 100)} % de votre banque !`
-        );
-        get().checkAchievements();
-      }, CURSED_DELAY_MS);
+      set({ pendingCursedAt: Date.now() });
       return { type: 'maudite' };
     }
 
     return null;
   },
 
+  // Règlement différé de la pomme maudite (appelé par tick)
+  settleCursed() {
+    const s = get();
+    if (!s.pendingCursedAt) return;
+    if (Date.now() < s.pendingCursedAt + CURSED_DELAY_MS) return;
+    const bonus = Math.max(
+      50,
+      Math.min(
+        s.endocraft * CURSED_BANK_PERCENT,
+        getProduction(s) * CURSED_CAP_SECONDS
+      )
+    );
+    set({
+      pendingCursedAt: 0,
+      endocraft: s.endocraft + bonus,
+      totalEndocraft: s.totalEndocraft + bonus,
+      lifetimeEndocraft: s.lifetimeEndocraft + bonus,
+    });
+    get().addToast(
+      '💀',
+      'KendiiX l’avait touchée…',
+      `…et ça paie : +${Math.round(CURSED_BANK_PERCENT * 100)} % de votre banque !`
+    );
+    get().checkAchievements();
+  },
+
   // ---------- Pluie de pommes ----------
   startAppleRain() {
+    const s = get();
+    const now = Date.now();
+    const active = s.appleRain && s.appleRain.endsAt > now;
     set({
-      appleRain: { endsAt: Date.now() + APPLE_RAIN.durationMs, spawned: 0 },
-      nextRainSpawnAt: Date.now(),
+      // Une pluie déjà active est PROLONGÉE (compteur conservé) : impossible
+      // de contourner le plafond de pommes en enchaînant les déclenchements.
+      appleRain: active
+        ? { ...s.appleRain, endsAt: now + APPLE_RAIN.durationMs }
+        : { endsAt: now + APPLE_RAIN.durationMs, spawned: 0 },
+      nextRainSpawnAt: now,
     });
     get().addToast(
       '🌧️',
@@ -841,11 +984,21 @@ export const useGame = create((set, get) => ({
     const s = get();
     const fruit = s.rainApples.find((a) => a.id === id);
     if (!fruit) return null;
-    // Mini-pommes de la tempête : 0,5 % de banque ; pluie : 2 %
+    // Mini-pommes de la tempête : % de la banque FIGÉE au déclenchement,
+    // plafonné en secondes de production. Pluie : % de la banque courante.
+    const base = fruit.mini
+      ? s.shadowStorm?.baseBank ?? s.endocraft
+      : s.endocraft;
     const bankPercent = fruit.mini
       ? SHADOW_STORM.miniBankPercent
       : APPLE_RAIN.bankPercent;
-    const gain = Math.max(APPLE_RAIN.minGain, s.endocraft * bankPercent);
+    const capSeconds = fruit.mini
+      ? SHADOW_STORM.miniCapSeconds
+      : APPLE_RAIN.capSeconds;
+    const gain = Math.max(
+      APPLE_RAIN.minGain,
+      Math.min(base * bankPercent, getProduction(s) * capSeconds)
+    );
     set({
       rainApples: s.rainApples.filter((a) => a.id !== id),
       endocraft: s.endocraft + gain,
@@ -855,11 +1008,12 @@ export const useGame = create((set, get) => ({
       shadowMinisCaught: fruit.mini
         ? s.shadowMinisCaught + 1
         : s.shadowMinisCaught,
-      // Tempête parfaite : pomme attrapée pendant une frénésie
-      ...(s.boostEndsAt > Date.now()
+      // Tempête parfaite : pomme de PLUIE attrapée pendant une frénésie
+      ...(s.boostEndsAt > Date.now() && !fruit.mini
         ? { rainFrenzyCatches: s.rainFrenzyCatches + 1 }
         : {}),
     });
+    get().checkAchievements();
     return gain;
   },
 
@@ -867,6 +1021,7 @@ export const useGame = create((set, get) => ({
   tick(dtMs) {
     const s = get();
     const patch = {};
+    const now = Date.now(); // déclaré AVANT tout usage (sinon TDZ fatale)
 
     // Production passive + auto-clicker du Développeur (clics avec la
     // puissance réelle, boost de frénésie inclus)
@@ -874,7 +1029,7 @@ export const useGame = create((set, get) => ({
     const staffMults = getStaffMults(s);
     let gained = (rate * dtMs) / 1000;
     if (staffMults.autoClickPerSec > 0) {
-      const boost = s.boostEndsAt > Date.now() ? s.boostMult : 1;
+      const boost = s.boostEndsAt > now ? s.boostMult : 1;
       gained += getClickPower(s) * boost * staffMults.autoClickPerSec * (dtMs / 1000);
     }
     if (gained > 0) {
@@ -884,7 +1039,7 @@ export const useGame = create((set, get) => ({
     }
 
     patch.playMs = s.playMs + dtMs;
-    patch.lastSeen = Date.now();
+    patch.lastSeen = now;
 
     // Quêtes du jour : génération au premier tick + reset à minuit local
     if (!s.quests || s.quests.date !== questDateKey()) {
@@ -892,7 +1047,7 @@ export const useGame = create((set, get) => ({
     }
 
     // Fin de boost
-    if (s.boostEndsAt && s.boostEndsAt <= Date.now()) {
+    if (s.boostEndsAt && s.boostEndsAt <= now) {
       patch.boostMult = 1;
       patch.boostEndsAt = 0;
     }
@@ -903,7 +1058,6 @@ export const useGame = create((set, get) => ({
     }
 
     // Apparition / expiration de la pomme dorée
-    const now = Date.now();
     if (s.apple && s.apple.expiresAt <= now) {
       patch.apple = null;
     } else if (!s.apple && now >= s.nextAppleAt && rate > 0) {
@@ -914,8 +1068,8 @@ export const useGame = create((set, get) => ({
       patch.apple = {
         id: now,
         type: get().rollAppleType(),
-        x: 10 + Math.random() * 80, // % de l'écran
-        y: 15 + Math.random() * 70,
+        x: 10 + Math.random() * 78, // % de l'écran (marges réelles)
+        y: 15 + Math.random() * 65,
         expiresAt: now + visibleMs,
       };
     }
@@ -932,7 +1086,9 @@ export const useGame = create((set, get) => ({
       const rain = s.appleRain;
       if (now >= rain.endsAt) {
         patch.appleRain = null;
-        patch.rainApples = [];
+        // Les mini-pommes de tempête encore en chute survivent à la fin
+        // de la pluie : elles ne partagent le tableau que par commodité.
+        patch.rainApples = s.rainApples.filter((a) => a.mini);
       } else if (
         now >= s.nextRainSpawnAt &&
         rain.spawned < APPLE_RAIN.maxApples
@@ -944,7 +1100,7 @@ export const useGame = create((set, get) => ({
           ...s.rainApples,
           {
             id: now + Math.random(),
-            x: 3 + Math.random() * 94, // % de la largeur d'écran
+            x: 3 + Math.random() * 88, // % de la largeur (pomme ~52px)
             fallMs,
             spawnedAt: now,
           },
@@ -956,17 +1112,25 @@ export const useGame = create((set, get) => ({
           Math.random() * (APPLE_RAIN.spawnMaxMs - APPLE_RAIN.spawnMinMs);
       }
     }
-    // Retire les pommes arrivées au sol (non attrapées)
-    if (s.rainApples.length > 0) {
-      const stillFalling = s.rainApples.filter(
-        (a) => now - a.spawnedAt < a.fallMs
-      );
-      if (stillFalling.length !== s.rainApples.length) {
-        patch.rainApples = stillFalling;
+    // Retire les pommes arrivées au sol (non attrapées). Part de la liste
+    // déjà patchée ci-dessus : sinon le filtre des mini-pommes (fin de
+    // pluie) serait écrasé au même tick.
+    {
+      const base = patch.rainApples ?? s.rainApples;
+      if (base.length > 0) {
+        const stillFalling = base.filter(
+          (a) => now - a.spawnedAt < a.fallMs
+        );
+        if (stillFalling.length !== base.length) {
+          patch.rainApples = stillFalling;
+        }
       }
     }
 
     set(patch);
+    // Après le set principal : le règlement de la pomme maudite (s'il y en
+    // a un) part d'un état frais — sinon son bonus serait écrasé par patch.
+    get().settleCursed();
   },
 
   // ---------- Succès ----------
@@ -988,7 +1152,8 @@ export const useGame = create((set, get) => ({
   // ---------- Notifications ----------
   addToast(icon, title, message, duration = 4000) {
     const id = ++toastSeq;
-    set({ toasts: [...get().toasts, { id, icon, title, message }] });
+    // Tas plafonné à 5 : une rafale de succès ne remplit pas l'écran
+    set({ toasts: [...get().toasts, { id, icon, title, message }].slice(-5) });
     setTimeout(() => {
       set({ toasts: get().toasts.filter((t) => t.id !== id) });
     }, duration);
@@ -1018,11 +1183,13 @@ export const useGame = create((set, get) => ({
       maxOfflineGain: s.maxOfflineGain,
       titleClicks: s.titleClicks,
       frenziesStarted: s.frenziesStarted,
+      pendingCursedAt: s.pendingCursedAt,
       quests: s.quests,
       questsClaimed: s.questsClaimed,
       casesOpened: s.casesOpened,
       caseLegendaryDrops: s.caseLegendaryDrops,
       renaissances: s.renaissances,
+      lastRenaissanceLifetime: s.lastRenaissanceLifetime || 0,
       playMs: s.playMs,
       lastSeen: s.lastSeen,
       rev: s.rev || 0,
@@ -1030,13 +1197,26 @@ export const useGame = create((set, get) => ({
   },
 
   applyState(loaded) {
-    set({ ...initialState(), ...loaded, lastSeen: Date.now() });
+    const cur = get();
+    const next = { ...initialState(), ...sanitizeLoaded(loaded || {}) };
+    // Un succès acquis ne se perd jamais, même sur un état serveur périmé
+    if (cur.achievements.length > 0) {
+      next.achievements = [
+        ...new Set([...next.achievements, ...cur.achievements]),
+      ];
+    }
+    // Une frénésie en cours n'est pas annulée par un état sans boost
+    if (!next.boostEndsAt && cur.boostEndsAt > Date.now()) {
+      next.boostMult = cur.boostMult;
+      next.boostEndsAt = cur.boostEndsAt;
+    }
+    set({ ...next, lastSeen: Date.now() });
   },
 
   saveLocal() {
     const state = get().exportState();
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, state }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_VERSION, state }));
     } catch {
       /* quota dépassé : on ignore */
     }
@@ -1047,55 +1227,84 @@ export const useGame = create((set, get) => ({
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.v === 1 && parsed.state) return parsed.state;
+      // V2 = reset mondial : les sauvegardes plus anciennes sont ignorées
+      if (parsed && parsed.v === SAVE_VERSION && parsed.state) {
+        return parsed.state;
+      }
     } catch {
       /* sauvegarde corrompue */
     }
     return null;
   },
 
+  // Gains d'absence (fermeture d'onglet, onglet en fond prolongé) :
+  // même formule pour le démarrage et le retour d'arrière-plan.
+  applyAwayCatchup(awayMs) {
+    const s = get();
+    const rate = getProduction(s);
+    if (rate <= 0 || awayMs <= 30_000) return null;
+    const capped = Math.min(
+      awayMs,
+      OFFLINE_CAP_MS + getStaffMults(s).offlineCapBonusMs
+    );
+    const eff = Math.min(1, OFFLINE_EFFICIENCY + getStaffMults(s).offlineEffBonus);
+    const gains = (rate * capped * eff) / 1000;
+    if (gains < 1) return null;
+    set({
+      endocraft: s.endocraft + gains,
+      totalEndocraft: s.totalEndocraft + gains,
+      lifetimeEndocraft: s.lifetimeEndocraft + gains,
+      maxOfflineGain: Math.max(s.maxOfflineGain || 0, gains),
+    });
+    return { durationMs: capped, gains, eff };
+  },
+
   // Appelé une fois au démarrage : charge la sauvegarde + calcule les gains hors-ligne
   load() {
     const local = get().loadLocal();
-    if (!local) return;
-    const state = { ...initialState(), ...local };
-    const rate = getProduction(state);
-
-    // Migration UNIQUE : les vieilles sauvegardes n'ont pas de compteur à vie —
-    // on le sème une seule fois avec le total de l'époque. (Un max() à chaque
-    // chargement posait problème : une modification admin du total à la
-    // hausse puis à la baisse laissait le compteur à vie bloqué au max.)
-    if (local.lifetimeEndocraft === undefined) {
-      state.lifetimeEndocraft = state.totalEndocraft || 0;
-    }
-
-    // Gains hors-ligne (plafond étendu par Fl0ryoz, efficacité par MathZMath)
-    const away = Date.now() - (local.lastSeen || Date.now());
-    let offlineReport = null;
-    if (rate > 0 && away > 30_000) {
-      const capped = Math.min(away, OFFLINE_CAP_MS + getStaffMults(state).offlineCapBonusMs);
-      const eff = Math.min(1, OFFLINE_EFFICIENCY + getStaffMults(state).offlineEffBonus);
-      const gains = (rate * capped * eff) / 1000;
-      if (gains >= 1) {
-        state.endocraft += gains;
-        state.totalEndocraft += gains;
-        state.lifetimeEndocraft += gains;
-        state.maxOfflineGain = Math.max(state.maxOfflineGain || 0, gains);
-        offlineReport = { durationMs: capped, gains, eff };
+    if (local) {
+      const away = Date.now() - (local.lastSeen || Date.now());
+      get().applyState(local);
+      const report = get().applyAwayCatchup(Math.max(0, away));
+      // Quêtes du jour (générées si absentes / date différente)
+      if (!get().quests || get().quests.date !== questDateKey()) {
+        set({ quests: generateDailyQuests(get()) });
       }
-    }
-
-    get().applyState(state);
-    // Quêtes du jour (générées si absentes / date différente)
-    if (!state.quests || state.quests.date !== questDateKey()) {
+      set({ offlineReport: report });
+      if (report) get().checkAchievements();
+    } else {
+      // Première partie (ou reset mondial V2 : l'ancienne save est ignorée)
       set({ quests: generateDailyQuests(get()) });
     }
-    set({ offlineReport });
+  },
+
+  // Déconnexion : la progression du compte ne doit pas fuiter vers le
+  // prochain compte (ou invité) ouvert sur le même navigateur.
+  resetForLogout() {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      /* rien */
+    }
+    set({
+      ...initialState(),
+      // Événements UI en cours : une pomme de l'ancien compte ne doit pas
+      // rester cliquable par le suivant.
+      apple: null,
+      appleRain: null,
+      rainApples: [],
+      nextRainSpawnAt: 0,
+      nextAppleAt: Date.now() + APPLE.minDelayMs,
+      offlineReport: null,
+      toasts: [],
+      cloudReady: true, // un invité repart de zéro, pas de fusion à attendre
+      quests: generateDailyQuests({ ...initialState() }),
+    });
   },
 
   // ---------- Sync cloud ----------
   // opts.migration : true pour une fusion post-login (progression locale en
-  // avance) — le serveur l'accepte sans contrôle dans la fenêtre post-login.
+  // avance) — le serveur la borne à ce que la production déclarée permet.
   async cloudSync(opts = {}) {
     if (!getToken()) return;
     // Au démarrage, on attend d'avoir récupéré l'état cloud (useAuth.init)
@@ -1143,6 +1352,9 @@ export const useGame = create((set, get) => ({
 // ---------- Boucle globale (démarrée depuis App) ----------
 
 let loopStarted = false;
+// Horodatage du dernier tick exécuté : sert de base au rattrapage
+// d'arrière-plan (les timers sont throttlés/suspendus par le navigateur).
+let lastTickAt = Date.now();
 
 export function startGameLoop() {
   if (loopStarted) return;
@@ -1153,37 +1365,107 @@ export function startGameLoop() {
   let lastSave = 0;
   let lastCloudSync = 0;
 
-  setInterval(() => {
-    const store = useGame.getState();
-    store.tick(TICK);
+  // Un SEUL onglet mène la danse (sinon : double production, saves et
+  // syncs concurrentes qui s'écrasent). Les autres onglets suivent l'état
+  // du leader via l'événement `storage` et reprennent la main s'il meurt.
+  const leadLoop = () => {
+    setInterval(() => {
+      const now = Date.now();
+      // dt réel plafonné à 1 s : un onglet en arrière-plan (timers throttlés
+      // à ~1 Hz) continue de produire en temps réel, sans emprunter de
+      // « gros dt » gratuit au retour.
+      const dt = Math.min(1000, Math.max(0, now - lastTickAt));
+      lastTickAt = now;
+      if (dt === 0) return;
 
-    const now = Date.now();
-    if (now - lastAchievementCheck >= 1000) {
-      lastAchievementCheck = now;
-      store.checkAchievements();
-    }
-    if (now - lastSave >= AUTOSAVE_MS) {
-      lastSave = now;
-      store.saveLocal();
-    }
-    if (now - lastCloudSync >= CLOUD_SYNC_MS) {
-      lastCloudSync = now;
-      store.cloudSync();
-    }
-  }, TICK);
+      const store = useGame.getState();
+      store.tick(dt);
+
+      if (now - lastAchievementCheck >= 1000) {
+        lastAchievementCheck = now;
+        store.checkAchievements();
+      }
+      if (now - lastSave >= AUTOSAVE_MS) {
+        lastSave = now;
+        store.saveLocal();
+      }
+      if (now - lastCloudSync >= CLOUD_SYNC_MS) {
+        lastCloudSync = now;
+        store.cloudSync();
+      }
+    }, TICK);
+  };
+
+  let following = false;
+  const followLeader = () => {
+    if (following) return; // un seul abonnement par onglet
+    following = true;
+    window.addEventListener('storage', (e) => {
+      if (e.key !== SAVE_KEY || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed && parsed.v === SAVE_VERSION && parsed.state) {
+          useGame.getState().applyState(parsed.state);
+        }
+      } catch {
+        /* save du leader illisible : on attend la suivante */
+      }
+    });
+  };
+
+  const tryLead = () => {
+    navigator.locks
+      .request(
+        'endoclicker-loop',
+        { ifAvailable: true },
+        (lock) => {
+          if (!lock) {
+            // Quelqu'un mène déjà : ce classe un miroir passif — l'événement
+            // `storage` (déclenché chez les AUTRES onglets à chaque écriture
+            // du leader) lui applique l'état à jour.
+            followLeader();
+            return;
+          }
+          leadLoop();
+          return new Promise(() => {}); // détient le verrou jusqu'à la fermeture
+        }
+      )
+      .catch(() => leadLoop()); //locks indisponible : on assume (rare)
+  };
+
+  if (navigator.locks?.request) {
+    tryLead();
+    // Si l'onglet leader se ferme, un suiveur reprend la main
+    setInterval(() => {
+      if (navigator.locks?.request) {
+        navigator.locks
+          .query({ name: 'endoclicker-loop' })
+          .then((info) => {
+            if (!info.held || info.held.length === 0) tryLead();
+          })
+          .catch(() => {});
+      }
+    }, 5_000);
+  } else {
+    leadLoop();
+  }
 
   // Sauvegarde de secours avant fermeture
   window.addEventListener('beforeunload', () => {
     useGame.getState().saveLocal();
+    useGame.getState().cloudSync();
   });
   document.addEventListener('visibilitychange', () => {
     const state = document.visibilityState;
     if (state === 'hidden') {
       useGame.getState().saveLocal();
       useGame.getState().cloudSync();
-    } else if (state === 'visible') {
-      // Retour sur l'onglet : sync immédiate (les timers étaient ralentis
-      // en arrière-plan, le score serveur peut être en retard)
+    } else {
+      // Retour sur l'onglet : rattrapage de la période où les timers
+      // étaient suspendus (base = dernier tick réellement exécuté),
+      // puis sync immédiate.
+      const away = Date.now() - lastTickAt;
+      if (away > 30_000) useGame.getState().applyAwayCatchup(away);
       useGame.getState().cloudSync();
     }
   });

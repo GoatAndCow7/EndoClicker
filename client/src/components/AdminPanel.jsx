@@ -7,19 +7,17 @@ import GameIcon from './GameIcon.jsx';
 
 // ============ Éditeur d'un joueur ============
 
-function NumberField({ label, value, onChange, suffix }) {
+function NumberField({ label, value, onChange, suffix, type = 'number' }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
+      <span className="label-caps mb-1 block">{label}</span>
       <input
-        type="number"
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm tabular-nums outline-none focus:border-ember-500/60"
+        className="input focus-ring tabular-nums text-sm"
       />
-      {suffix && <span className="mt-0.5 block text-[10px] text-slate-500">{suffix}</span>}
+      {suffix && <span className="mt-0.5 block text-3xs text-ink-4">{suffix}</span>}
     </label>
   );
 }
@@ -34,12 +32,9 @@ function Chips({ items, selected, onToggle }) {
             key={item.id}
             type="button"
             onClick={() => onToggle(item.id)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-              active
-                ? 'border-ember-400/60 bg-ember-600/30 text-ember-200'
-                : 'border-white/10 bg-white/5 text-slate-400 hover:text-slate-200'
-            }`}
+            aria-pressed={active}
             title={item.name || item.desc}
+            className={active ? 'chip chip-accent' : 'chip text-ink-3 hover:text-ink'}
           >
             {active ? '✓ ' : ''}
             <GameIcon icon={item.icon} alt={item.name} className="mr-1 h-4 w-4" />{' '}
@@ -71,15 +66,15 @@ function UserEditor({ userId, onClose, onSaved }) {
       .catch((e) => setError(e.message));
   }, [userId]);
 
-  if (error) {
+  if (error && !user) {
     return (
-      <div className="p-6 text-center text-sm text-red-300">{error}</div>
+      <div className="p-6 text-center text-sm text-danger-bright">{error}</div>
     );
   }
   if (!user) {
     return (
       <div className="flex items-center justify-center p-10">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-ember-500 border-t-transparent" />
+        <div className="spinner" />
       </div>
     );
   }
@@ -199,17 +194,23 @@ function UserEditor({ userId, onClose, onSaved }) {
     );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#17130f] shadow-2xl">
+    <div className="modal-backdrop">
+      <div className="modal-card w-full max-w-2xl">
         {/* En-tête */}
-        <div className="flex items-center justify-between border-b border-white/10 p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-ember-600/20 text-xl">
-              🛠️
-            </span>
-            <div>
-              <h3 className="font-extrabold">{user.pseudo}</h3>
-              <p className="text-[11px] text-slate-500">
+        <div className="modal-head">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="icon-tile">🛠️</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h3 className="text-base font-extrabold text-ink">{user.pseudo}</h3>
+                <span className={user.online ? 'chip chip-success' : 'chip chip-info'}>
+                  ● {user.online ? 'En ligne' : 'Hors ligne'}
+                </span>
+                {antiCheatOff && (
+                  <span className="chip chip-warning">Anti-triche OFF</span>
+                )}
+              </div>
+              <p className="mt-0.5 text-2xs text-ink-4">
                 ID #{user.id} • créé le{' '}
                 {new Date(user.created_at).toLocaleDateString('fr-FR')}
               </p>
@@ -217,26 +218,24 @@ function UserEditor({ userId, onClose, onSaved }) {
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+            className="modal-x"
             aria-label="Fermer"
           >
             ✕
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        <div className="modal-body space-y-3">
           {error && (
-            <p className="rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+            <p className="rounded-xl border border-danger/40 bg-danger-deep/40 px-3 py-2 text-sm text-danger-bright">
               {error}
             </p>
           )}
 
           {/* Monnaie */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
-              💰 EndoCraft
-            </h4>
-            <div className="grid grid-cols-3 gap-2">
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">💰 EndoCraft</h4>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <NumberField label="Solde actuel" value={state.endocraft} onChange={setNumber('endocraft')} />
               <NumberField label="Total récolté" value={state.totalEndocraft} onChange={setNumber('totalEndocraft')} />
               <NumberField label="Clics" value={state.clicks} onChange={setNumber('clicks')} />
@@ -253,7 +252,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                 suffix="×15 % de production chacune"
               />
               <NumberField
-                label="Cases ouvertes"
+                label="Caisses ouvertes"
                 value={state.casesOpened || 0}
                 onChange={(v) => patchState({ casesOpened: Math.max(0, Math.floor(Number(v) || 0)) })}
               />
@@ -263,6 +262,14 @@ function UserEditor({ userId, onClose, onSaved }) {
                 onChange={(v) => patchState({ caseLegendaryDrops: Math.max(0, Math.floor(Number(v) || 0)) })}
               />
             </div>
+            {state.lastRenaissanceLifetime != null && (
+              <p className="mt-2 text-2xs text-ink-3">
+                Dernier seuil :{' '}
+                <span className="font-bold tabular-nums text-ink-2">
+                  {fmt(state.lastRenaissanceLifetime)}
+                </span>
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {[
                 { label: '+1k', fn: () => patchState({ endocraft: state.endocraft + 1e3 }) },
@@ -274,7 +281,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                 <button
                   key={b.label}
                   onClick={b.fn}
-                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300 hover:bg-white/10"
+                  className="btn-ghost focus-ring h-9 px-2.5 text-2xs"
                 >
                   {b.label}
                 </button>
@@ -283,18 +290,16 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Générateurs */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
-              🪓 Générateurs possédés
-            </h4>
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">🪓 Générateurs possédés</h4>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {GENERATORS.map((g) => (
                 <label
                   key={g.id}
-                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5"
+                  className="flex items-center gap-2 rounded-lg border border-line/10 bg-void/30 px-2 py-1.5"
                 >
-                  <GameIcon icon={g.icon} alt={g.name} className="h-6 w-6" />
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                  <GameIcon icon={g.icon} alt={g.name} className="h-6 w-6 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink-2">
                     {g.name}
                   </span>
                   <input
@@ -302,7 +307,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                     min="0"
                     value={state.generators[g.id] || 0}
                     onChange={(e) => setGen(g.id)(e.target.value)}
-                    className="w-16 rounded bg-black/40 px-1.5 py-1 text-right text-xs tabular-nums outline-none"
+                    className="input focus-ring tabular-nums w-16 px-1.5 py-1 text-right text-xs"
                   />
                 </label>
               ))}
@@ -310,42 +315,41 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Améliorations */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">
               ⬆️ Améliorations ({(state.upgrades || []).length}/{UPGRADES.length})
             </h4>
             <Chips items={UPGRADES} selected={state.upgrades || []} onToggle={toggleIn('upgrades')} />
           </section>
 
           {/* Équipe */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">
               🤝 Équipe ({(state.staff || []).length}/{STAFF.length})
             </h4>
             <Chips items={STAFF} selected={state.staff || []} onToggle={toggleIn('staff')} />
           </section>
 
           {/* Succès */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">
               🏅 Succès ({(state.achievements || []).length}/{ACHIEVEMENTS.length})
             </h4>
             <Chips items={ACHIEVEMENTS} selected={state.achievements || []} onToggle={toggleIn('achievements')} />
           </section>
 
           {/* Cosmétiques : attribuer/retirer les skins + définir l'équipé */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
-              ✨ X
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">
+              ✨ Cosmétiques ({(state.cosmetics || []).length}/
+              {COIN_SKINS.filter((s) => s.caseOnly).length})
             </h4>
             <Chips
               items={COIN_SKINS.filter((s) => s.caseOnly)}
               selected={state.cosmetics || []}
               onToggle={toggleCosmetic}
             />
-            <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Skin équipé
-            </p>
+            <p className="label-caps mb-1.5 mt-3">Skin équipé</p>
             <div className="flex flex-wrap gap-1.5">
               {COIN_SKINS.map((s) => {
                 const owned = s.cost === 0 || (state.cosmetics || []).includes(s.id);
@@ -356,13 +360,13 @@ function UserEditor({ userId, onClose, onSaved }) {
                     type="button"
                     disabled={!owned}
                     onClick={() => patchState({ equippedCoin: s.id })}
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    className={
                       equipped
-                        ? 'border-emerald-400/60 bg-emerald-600/25 text-emerald-200'
+                        ? 'chip chip-success'
                         : owned
-                          ? 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
-                          : 'cursor-not-allowed border-white/5 bg-white/5 text-slate-600'
-                    }`}
+                          ? 'chip text-ink-2 hover:text-ink'
+                          : 'chip cursor-not-allowed text-ink-4 opacity-60'
+                    }
                   >
                     {equipped ? '✓ ' : ''}
                     <GameIcon icon={s.icon} alt={s.name} className="h-4 w-4" /> {s.name}
@@ -373,8 +377,8 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Tags de prestige */}
-          <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">
               🏷️ Tags possédés ({(state.tags || []).length}/{TAGS.length})
             </h4>
             <div className="flex flex-wrap gap-1.5">
@@ -393,11 +397,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                         ...(equipped ? { equippedTag: null } : {}),
                       });
                     }}
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                      owned
-                        ? 'border-ember-500/50 bg-ember-600/25 text-ember-200'
-                        : 'border-white/10 bg-white/5 text-slate-500'
-                    }`}
+                    className={owned ? 'chip chip-accent' : 'chip text-ink-4'}
                   >
                     {owned ? '✓ ' : ''}
                     {tag.label}
@@ -405,17 +405,11 @@ function UserEditor({ userId, onClose, onSaved }) {
                 );
               })}
             </div>
-            <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Tag équipé
-            </p>
+            <p className="label-caps mb-1.5 mt-3">Tag équipé</p>
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => patchState({ equippedTag: null })}
-                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  !state.equippedTag
-                    ? 'border-emerald-400/60 bg-emerald-600/25 text-emerald-200'
-                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                }`}
+                className={!state.equippedTag ? 'chip chip-success' : 'chip text-ink-3 hover:text-ink'}
               >
                 Aucun
               </button>
@@ -423,11 +417,11 @@ function UserEditor({ userId, onClose, onSaved }) {
                 <button
                   key={tag.id}
                   onClick={() => patchState({ equippedTag: tag.id })}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  className={
                     state.equippedTag === tag.id
-                      ? 'border-emerald-400/60 bg-emerald-600/25 text-emerald-200'
-                      : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
-                  }`}
+                      ? 'chip chip-success'
+                      : 'chip text-ink-2 hover:text-ink'
+                  }
                 >
                   {state.equippedTag === tag.id ? '✓ ' : ''}
                   {tag.label}
@@ -437,23 +431,22 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Identité */}
-          <section className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-ember-300">
-              👤 Identité
-            </h4>
+          <section className="panel-flat rounded-xl p-3">
+            <h4 className="section-title mb-2">👤 Identité</h4>
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-40 flex-1">
-                <NumberField label="Pseudo" value={newPseudo} onChange={setNewPseudo} />
+                <NumberField type="text" label="Pseudo" value={newPseudo} onChange={setNewPseudo} />
               </div>
               <button
                 onClick={savePseudo}
                 disabled={busy || newPseudo === user.pseudo}
-                className="btn-ghost text-xs disabled:opacity-50"
+                className="btn-ghost focus-ring h-11 text-2xs disabled:opacity-50 md:h-10"
               >
                 Renommer
               </button>
               <div className="min-w-40 flex-1">
                 <NumberField
+                  type="text"
                   label="Nouveau mot de passe"
                   value={newPassword}
                   onChange={setNewPassword}
@@ -463,7 +456,7 @@ function UserEditor({ userId, onClose, onSaved }) {
               <button
                 onClick={savePassword}
                 disabled={busy || newPassword.length < 6}
-                className="btn-ghost text-xs disabled:opacity-50"
+                className="btn-ghost focus-ring h-11 text-2xs disabled:opacity-50 md:h-10"
               >
                 Définir
               </button>
@@ -471,33 +464,20 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Effets en direct (SSE) */}
-          <section className="rounded-xl border border-violet-400/30 bg-violet-950/20 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-violet-300">
-                ⚡ Effets en direct
-              </h4>
-              <span
-                className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                  user.online
-                    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'
-                    : 'border-white/10 bg-white/5 text-slate-500'
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    user.online ? 'bg-emerald-400' : 'bg-slate-500'
-                  }`}
-                />
-                {user.online ? 'En ligne' : 'Hors ligne'}
+          <section className="panel-flat rounded-xl p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h4 className="section-title">⚡ Effets en direct</h4>
+              <span className={user.online ? 'chip chip-success' : 'chip chip-info'}>
+                ● {user.online ? 'En ligne' : 'Hors ligne'}
               </span>
             </div>
             {user.online ? (
               <>
-                <p className="mb-2 text-[11px] text-slate-400">
+                <p className="mb-2 text-2xs text-ink-3">
                   Appliqués instantanément sur son écran.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-2xs font-semibold text-ink-3">
                     🔥 Frénésie ×7 :
                   </span>
                   {[30, 120, 300].map((d) => (
@@ -505,7 +485,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                       key={d}
                       onClick={() => giveFrenzy(d)}
                       disabled={busy}
-                      className="btn-ghost px-2.5 py-1 text-[11px]"
+                      className="btn-ghost focus-ring h-9 px-2.5 text-2xs"
                     >
                       {d >= 60 ? `${d / 60} min` : `${d} s`}
                     </button>
@@ -513,7 +493,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                   <button
                     onClick={() => spawnApple()}
                     disabled={busy}
-                    className="btn-ghost px-2.5 py-1 text-[11px]"
+                    className="btn-ghost focus-ring h-9 px-2.5 text-2xs"
                   >
                     🎲 Pomme aléatoire
                   </button>
@@ -528,7 +508,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                       key={type}
                       onClick={() => spawnApple(type)}
                       disabled={busy}
-                      className="btn-ghost px-2.5 py-1 text-[11px]"
+                      className="btn-ghost focus-ring h-9 px-2.5 text-2xs"
                     >
                       {label}
                     </button>
@@ -536,7 +516,7 @@ function UserEditor({ userId, onClose, onSaved }) {
                 </div>
               </>
             ) : (
-              <p className="text-[11px] text-slate-500">
+              <p className="text-2xs text-ink-4">
                 Ce joueur n'est pas connecté — les effets en direct ne peuvent
                 pas lui être envoyés.
               </p>
@@ -544,13 +524,11 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Anti-triche */}
-          <section className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <section className="panel-flat rounded-xl p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-ember-300">
-                  🛡️ Anti-triche
-                </h4>
-                <p className="mt-0.5 text-[11px] text-slate-400">
+                <h4 className="section-title">🛡️ Anti-triche</h4>
+                <p className="mt-0.5 text-2xs text-ink-3">
                   {antiCheatOff
                     ? 'Désactivée : les synchros de ce joueur ne sont plus contrôlées.'
                     : 'Activée : les synchros aux gains impossibles sont refusées.'}
@@ -562,9 +540,9 @@ function UserEditor({ userId, onClose, onSaved }) {
                   toggleAntiCheat();
                 }}
                 disabled={busy}
-                className={`btn shrink-0 text-xs ${
+                className={`focus-ring h-11 shrink-0 text-2xs md:h-10 ${
                   antiCheatOff
-                    ? 'bg-amber-600/30 text-amber-300 hover:bg-amber-600/40 border border-amber-500/40'
+                    ? 'btn border border-warning/45 bg-warning/10 text-warning-bright hover:bg-warning/20'
                     : 'btn-ghost'
                 }`}
               >
@@ -574,36 +552,36 @@ function UserEditor({ userId, onClose, onSaved }) {
           </section>
 
           {/* Zone dangereuse */}
-          <section className="rounded-xl border border-red-500/30 bg-red-950/20 p-3">
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-red-300">
+          <section className="panel-flat rounded-xl border-danger/40 bg-danger-deep/30 p-3">
+            <h4 className="section-title mb-2 text-danger-bright">
               ⚠️ Zone dangereuse
             </h4>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setConfirmDanger(confirmDanger === 'reset' ? null : 'reset')}
-                className="rounded-lg border border-red-500/40 bg-red-600/10 px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-600/20"
+                className="btn-danger focus-ring h-11 text-2xs md:h-10"
               >
                 Réinitialiser la progression
               </button>
               <button
                 onClick={() => setConfirmDanger(confirmDanger === 'delete' ? null : 'delete')}
-                className="rounded-lg border border-red-500/40 bg-red-600/10 px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-600/20"
+                className="btn-danger focus-ring h-11 text-2xs md:h-10"
               >
                 Supprimer le compte
               </button>
             </div>
             {confirmDanger === 'reset' && (
-              <div className="mt-2 rounded-lg bg-black/40 p-2 text-xs text-red-200">
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-void/40 p-2 text-xs text-danger-bright">
                 Effacer TOUTE la progression de {user.pseudo} ?
-                <button onClick={resetProgress} disabled={busy} className="btn ml-2 bg-red-600 text-white hover:bg-red-500">
+                <button onClick={resetProgress} disabled={busy} className="btn-danger focus-ring h-9 px-3 text-2xs">
                   Confirmer
                 </button>
               </div>
             )}
             {confirmDanger === 'delete' && (
-              <div className="mt-2 rounded-lg bg-black/40 p-2 text-xs text-red-200">
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-void/40 p-2 text-xs text-danger-bright">
                 Supprimer définitivement le compte {user.pseudo} ?
-                <button onClick={deleteAccount} disabled={busy} className="btn ml-2 bg-red-600 text-white hover:bg-red-500">
+                <button onClick={deleteAccount} disabled={busy} className="btn-danger focus-ring h-9 px-3 text-2xs">
                   Confirmer
                 </button>
               </div>
@@ -612,8 +590,8 @@ function UserEditor({ userId, onClose, onSaved }) {
         </div>
 
         {/* Pied : enregistrer */}
-        <div className="border-t border-white/10 p-3">
-          <button onClick={saveState} disabled={busy} className="btn-primary w-full">
+        <div className="modal-foot">
+          <button onClick={saveState} disabled={busy} className="btn-primary focus-ring h-11 w-full text-2xs md:h-10">
             {busy ? 'Enregistrement…' : '💾 Enregistrer la progression'}
           </button>
         </div>
@@ -657,7 +635,7 @@ export default function AdminPanel() {
   return (
     <div className="space-y-3">
       {error && (
-        <p className="rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-300">
+        <p className="rounded-xl border border-danger/40 bg-danger-deep/40 p-3 text-sm text-danger-bright">
           {error}
         </p>
       )}
@@ -665,17 +643,17 @@ export default function AdminPanel() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-3 gap-2">
-          <div className="panel p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Joueurs</p>
-            <p className="text-xl font-extrabold text-ember-200">{fmtInt(stats.users)}</p>
+          <div className="stat-tile text-center">
+            <p className="text-3xs font-bold uppercase tracking-widest text-ink-3">Joueurs</p>
+            <p className="stat-tile-value text-base">{fmtInt(stats.users)}</p>
           </div>
-          <div className="panel p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Économie</p>
-            <p className="text-xl font-extrabold text-ember-200">{fmt(stats.economy)}</p>
+          <div className="stat-tile text-center">
+            <p className="text-3xs font-bold uppercase tracking-widest text-ink-3">Économie</p>
+            <p className="stat-tile-value text-base">{fmt(stats.economy)}</p>
           </div>
-          <div className="panel p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Top</p>
-            <p className="truncate text-sm font-bold text-ember-200">
+          <div className="stat-tile text-center">
+            <p className="text-3xs font-bold uppercase tracking-widest text-ink-3">Top</p>
+            <p className="stat-tile-value truncate">
               {stats.top[0] ? `🥇 ${stats.top[0].pseudo}` : '—'}
             </p>
           </div>
@@ -683,48 +661,52 @@ export default function AdminPanel() {
       )}
 
       {/* Recherche */}
-      <input
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          refresh(e.target.value);
-        }}
-        placeholder="🔍 Rechercher un joueur…"
-        className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-ember-500/60"
-      />
+      <div className="flex gap-2">
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            refresh(e.target.value);
+          }}
+          placeholder="Rechercher un joueur…"
+          className="input focus-ring min-w-0 flex-1 text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => refresh()}
+          className="btn-primary focus-ring h-11 shrink-0 text-2xs md:h-10"
+        >
+          Rechercher
+        </button>
+      </div>
 
       {/* Liste */}
       {!users && (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl bg-white/5" />
+            <div key={i} className="h-14 animate-pulse rounded-xl bg-surface/5" />
           ))}
         </div>
       )}
       {users && filtered.length === 0 && (
-        <p className="rounded-xl border border-dashed border-white/10 p-4 text-center text-sm text-slate-500">
-          Aucun joueur trouvé.
-        </p>
+        <p className="empty-state text-sm">Aucun joueur trouvé.</p>
       )}
       {users &&
         filtered.map((u) => (
-          <div
-            key={u.id}
-            className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-black/40 text-sm font-extrabold text-ember-300">
+          <div key={u.id} className="list-row p-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-void/40 text-sm font-extrabold text-accent-soft">
               {u.pseudo.slice(0, 2).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{u.pseudo}</p>
-              <p className="text-[11px] text-slate-500">
+              <p className="truncate text-sm font-bold text-ink">{u.pseudo}</p>
+              <p className="truncate text-2xs tabular-nums text-ink-4">
                 {fmt(u.total)} EndoCraft • 🏅 {u.achievements} • vu le{' '}
                 {new Date(u.updated_at).toLocaleDateString('fr-FR')}
               </p>
             </div>
             <button
               onClick={() => setEditing(u.id)}
-              className="btn-ghost shrink-0 text-xs"
+              className="btn-ghost focus-ring h-11 shrink-0 text-2xs md:h-10"
             >
               Éditer
             </button>

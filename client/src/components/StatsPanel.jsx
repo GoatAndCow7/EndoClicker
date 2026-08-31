@@ -11,16 +11,14 @@ import {
 } from '../game/constants';
 import GameIcon from './GameIcon.jsx';
 
-function StatCard({ icon, label, value, sub }) {
+function StatCard({ icon, label, value, sub, big = true }) {
   return (
-    <div className="panel p-3 text-center">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+    <div className="stat-tile text-center">
+      <p className="text-3xs font-bold uppercase tracking-widest text-ink-3">
         {icon} {label}
       </p>
-      <p className="mt-1 text-lg font-extrabold text-ember-200 tabular-nums">
-        {value}
-      </p>
-      {sub && <p className="text-[10px] text-slate-500">{sub}</p>}
+      <p className={`stat-tile-value mt-0.5 ${big ? 'text-base' : ''}`}>{value}</p>
+      {sub && <p className="text-3xs tabular-nums text-ink-4">{sub}</p>}
     </div>
   );
 }
@@ -73,7 +71,7 @@ export default function StatsPanel() {
   return (
     <div className="space-y-4">
       {/* Pommes & clics */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatCard
           icon="🍎"
           label="Pommes dorées"
@@ -92,10 +90,8 @@ export default function StatsPanel() {
       {/* Répartition par type de pomme */}
       {Object.keys(applesByType).length > 0 && (
         <section>
-          <h3 className="mb-2 px-1 text-sm font-bold uppercase tracking-wider text-slate-400">
-            🧺 Pommes attrapées par type
-          </h3>
-          <div className="grid grid-cols-5 gap-2">
+          <h3 className="section-title mb-2">🧺 Pommes attrapées par type</h3>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {[
               ['doree', '🍎 Dorée'],
               ['orage', '🌧️ Orage'],
@@ -103,21 +99,16 @@ export default function StatsPanel() {
               ['cristal', '💎 Cristal'],
               ['maudite', '💀 Maudite'],
             ].map(([type, label]) => (
-              <div
-                key={type}
-                className="rounded-xl border border-white/10 bg-white/5 p-2 text-center"
-              >
-                <p className="text-sm font-extrabold tabular-nums text-ember-200">
+              <div key={type} className="stat-tile text-center">
+                <p className="stat-tile-value text-sm">
                   {fmtInt(applesByType[type] || 0)}
                 </p>
-                <p className="mt-0.5 text-[10px] leading-tight text-slate-400">
-                  {label}
-                </p>
+                <p className="mt-0.5 text-3xs leading-tight text-ink-3">{label}</p>
               </div>
             ))}
           </div>
           {shadowMinisCaught > 0 && (
-            <p className="mt-1.5 px-1 text-[10px] text-slate-500">
+            <p className="mt-1.5 text-3xs tabular-nums text-ink-4">
               🌑 {fmtInt(shadowMinisCaught)} mini-pommes attrapées pendant les
               tempêtes de clics
             </p>
@@ -126,7 +117,7 @@ export default function StatsPanel() {
       )}
 
       {/* Production */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatCard
           icon="⚙️"
           label="Production"
@@ -148,7 +139,7 @@ export default function StatsPanel() {
       </div>
 
       {/* Richesse */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatCard
           icon="💰"
           label="Total (run)"
@@ -174,7 +165,7 @@ export default function StatsPanel() {
       </div>
 
       {/* Moyennes */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatCard
           icon="🎯"
           label="Moy. / clic"
@@ -196,56 +187,64 @@ export default function StatsPanel() {
       </div>
 
       {/* Collection */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatCard
           icon="🪓"
           label="Générateurs"
           value={`${totalGens}`}
           sub={`${distGens}/${GENERATORS.length} types`}
+          big={false}
         />
         <StatCard
           icon="⬆️"
           label="Améliorations"
           value={`${upgrades.length}/${UPGRADES.length}`}
+          big={false}
         />
-        <StatCard icon="🤝" label="Équipe" value={`${staff.length}/${STAFF.length}`} />
+        <StatCard
+          icon="🤝"
+          label="Équipe"
+          value={`${staff.length}/${STAFF.length}`}
+          big={false}
+        />
         <StatCard
           icon="🏅"
           label="Succès"
           value={`${achievements.length}/${ACHIEVEMENTS.length}`}
+          big={false}
         />
       </div>
 
       {/* Répartition par générateur */}
       {ownedGens.length > 0 && (
         <section>
-          <h3 className="mb-2 px-1 text-sm font-bold uppercase tracking-wider text-slate-400">
-            🏭 Répartition de la production
-          </h3>
+          <h3 className="section-title mb-2">🏭 Répartition de la production</h3>
           <div className="space-y-1.5">
             {ownedGens.map((g) => {
               const share = (g.rate / rawSum) * 100;
               return (
                 <div
                   key={g.id}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5"
+                  className="flex items-center gap-2.5 rounded-xl border border-line/10 bg-surface/5 px-2.5 py-1.5"
                 >
-                  <GameIcon icon={g.icon} alt={g.name} className="h-6 w-6" />
-                  <span className="w-28 shrink-0 truncate text-xs font-semibold">
+                  <GameIcon icon={g.icon} alt={g.name} className="h-6 w-6 shrink-0" />
+                  <span className="w-28 shrink-0 truncate text-xs font-semibold text-ink-2">
                     {g.name}
                   </span>
-                  <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-slate-400">
+                  <span className="w-8 shrink-0 text-right text-2xs tabular-nums text-ink-3">
                     ×{g.count}
                   </span>
-                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-black/40">
+                  <div className="progress-bar min-w-0 flex-1">
                     <div
-                      className="h-full rounded-full bg-ember-500/70"
+                      className="progress-bar-fill"
                       style={{ width: `${share}%` }}
                     />
                   </div>
-                  <span className="w-24 shrink-0 text-right text-[11px] tabular-nums">
-                    <b className="text-ember-300">{fmt(g.rate)}/s</b>{' '}
-                    <span className="text-slate-500">{Math.round(share)} %</span>
+                  <span className="w-24 shrink-0 text-right text-2xs tabular-nums">
+                    <span className="font-semibold text-accent-soft">
+                      {fmt(g.rate)}/s
+                    </span>{' '}
+                    <span className="text-ink-4">{Math.round(share)} %</span>
                   </span>
                 </div>
               );

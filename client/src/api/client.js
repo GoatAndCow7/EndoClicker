@@ -14,7 +14,13 @@ export function clearToken() {
 
 export function decodePseudo(token) {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Le JWT encode son payload en base64url (- et _ au lieu de + et /) :
+    // on le reconvertit en base64 standard avant atob.
+    const b64 = token
+      .split('.')[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64));
     return payload.pseudo || null;
   } catch {
     return null;

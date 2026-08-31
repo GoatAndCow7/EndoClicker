@@ -3,6 +3,15 @@ import { api, getToken, setToken, clearToken, decodePseudo } from '../api/client
 import { useGame } from '../game/store';
 import { connectEvents, disconnectEvents } from '../game/events';
 
+// Score de « fraîcheur » d'un état pour la fusion login/init : on compare
+// le total À VIE (jamais remis à zéro, même par une Renaissance) puis la
+// date. Comparer `totalEndocraft` seul était un piège : il retombe à 0 à
+// chaque Renaissance, ce qui faisait gagner les vieilles saves locales.
+function stateScore(x) {
+  if (!x) return -1;
+  return (x.lifetimeEndocraft || 0) * 2 + (x.lastSeen || 0);
+}
+
 export const useAuth = create((set, get) => ({
   user: null, // pseudo ou null (invité)
   authModal: null, // null | { mode: 'login' | 'register' }
@@ -29,7 +38,7 @@ export const useAuth = create((set, get) => ({
       const { state: cloud } = await api('/api/state');
       if (cloud) {
         const local = useGame.getState().loadLocal();
-        if (!local || cloud.totalEndocraft >= local.totalEndocraft) {
+        if (!local || stateScore(cloud) >= stateScore(local)) {
           useGame.getState().applyState(cloud);
         }
         // Si l'appareil est devant (synchros précédentes échouées, retour
@@ -105,7 +114,7 @@ export const useAuth = create((set, get) => ({
     // Le cloud est désormais la référence : les syncs sont autorisées
     useGame.setState({ cloudReady: true });
 
-    if (local && (!cloud || local.totalEndocraft > cloud.totalEndocraft)) {
+    if (local && stateScore(local) > stateScore(cloud)) {
       // Le farm local de cet appareil part dans le cloud (migration)
       game.applyState(local);
       await game.cloudSync({ migration: true });
@@ -126,9 +135,15 @@ export const useAuth = create((set, get) => ({
   },
 
   logout() {
+    // Dernière sauvegarde du compte, puis remise à zéro COMPLÈTE : la
+    // progression ne doit pas fuiter vers le prochain compte (ou invité)
+    // ouvert sur ce navigateur. Le fetch de sync part immédiatement avec
+    // le token — clearToken arrive après le lancement de la requête.
     useGame.getState().saveLocal();
+    useGame.getState().cloudSync();
     disconnectEvents();
     clearToken();
+    useGame.getState().resetForLogout();
     set({ user: null });
   },
 }));

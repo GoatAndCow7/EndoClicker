@@ -2,6 +2,170 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Design system V2 — « Ember premium raffiné »
+   Toute couleur passe par des variables (jour : neutres chauds,
+   nuit : neutres froids). Les composants n'écrivent plus de
+   hex/rgba en dur : ils consomment les classes ci-dessous ou
+   les utilitaires Tailwind mappés (text-ink-3, bg-surface/5,
+   border-line/10, text-accent-soft…).
+   ============================================================ */
+
+:root {
+  /* --- Fonds & surfaces --- */
+  --bg-app: 18 15 11;
+  --panel-bg: 22 19 15;
+  --surface: 255 244 230;
+  --void: 8 6 4;
+  --sheen: 255 244 230;
+  --line: 255 226 193;
+
+  /* --- Texte (pierre ambrée) --- */
+  --text-1: 250 246 238;
+  --text-2: 214 205 190;
+  --text-3: 166 156 140;
+  --text-4: 122 113 101;
+
+  /* --- Accent ember --- */
+  --accent: 251 129 19;
+  --accent-strong: 236 102 8;
+  --accent-deep: 204 80 10;
+  --accent-text: 255 196 117;
+  --accent-text-strong: 255 217 163;
+  --accent-display: 255 237 209;
+  --accent-overlay: 64 26 12;
+
+  /* --- Sémantiques --- */
+  --success: 52 211 153;
+  --success-bright: 110 231 183;
+  --success-deep: 6 58 44;
+  --warning: 251 191 36;
+  --warning-bright: 252 211 77;
+  --danger: 248 113 113;
+  --danger-bright: 252 165 165;
+  --danger-strong: 239 68 68;
+  --danger-deep: 70 12 12;
+  --info: 75 156 216;
+  --storm: 167 139 250;
+  --storm-bright: 221 214 254;
+
+  /* --- Raretés --- */
+  --rarity-commun: 75 156 216;
+  --rarity-rare: 139 92 246;
+  --rarity-epique: 236 72 153;
+  --rarity-legendaire: 245 158 11;
+
+  /* --- Profondeur --- */
+  --shadow-1:
+    0 1px 2px rgba(10, 7, 4, 0.28),
+    0 2px 8px rgba(10, 7, 4, 0.2);
+  --shadow-2:
+    inset 0 1px 0 rgba(255, 244, 230, 0.05),
+    0 2px 6px rgba(10, 7, 4, 0.3),
+    0 10px 28px rgba(10, 7, 4, 0.36);
+  --shadow-3:
+    inset 0 1px 0 rgba(255, 244, 230, 0.07),
+    0 4px 14px rgba(10, 7, 4, 0.42),
+    0 20px 50px rgba(10, 7, 4, 0.55);
+  --glow-accent: 0 0 22px rgba(251, 129, 19, 0.45);
+  --ring-focus: 251 129 19;
+}
+
+/* --- Nuit : un VRAI thème froid, pas juste un filtre --- */
+.night {
+  --bg-app: 9 11 20;
+  --panel-bg: 14 16 27;
+  --surface: 214 226 255;
+  --void: 2 3 8;
+  --sheen: 214 226 255;
+  --line: 186 200 240;
+
+  --text-1: 226 232 244;
+  --text-2: 178 188 206;
+  --text-3: 136 147 170;
+  --text-4: 98 108 130;
+
+  /* Ember « lanterne » : désaturée et douce sur fond froid */
+  --accent: 238 126 44;
+  --accent-strong: 214 102 26;
+  --accent-deep: 172 82 22;
+  --accent-text: 244 197 146;
+  --accent-text-strong: 246 213 170;
+  --accent-display: 240 224 204;
+  --accent-overlay: 46 28 18;
+
+  --success: 58 214 160;
+  --success-bright: 118 236 192;
+  --success-deep: 7 48 38;
+  --warning: 240 185 66;
+  --warning-bright: 246 199 92;
+  --danger: 246 122 122;
+  --danger-bright: 250 158 158;
+  --danger-strong: 230 76 76;
+  --danger-deep: 58 12 14;
+  --info: 96 164 220;
+  --storm: 172 148 246;
+  --storm-bright: 224 218 252;
+
+  --rarity-commun: 96 168 224;
+  --rarity-rare: 154 112 240;
+  --rarity-epique: 232 92 158;
+  --rarity-legendaire: 244 168 40;
+
+  --shadow-1:
+    0 1px 2px rgba(2, 4, 10, 0.36),
+    0 2px 8px rgba(2, 4, 10, 0.3);
+  --shadow-2:
+    inset 0 1px 0 rgba(214, 226, 255, 0.05),
+    0 2px 6px rgba(2, 4, 10, 0.4),
+    0 10px 28px rgba(2, 4, 10, 0.5);
+  --shadow-3:
+    inset 0 1px 0 rgba(214, 226, 255, 0.07),
+    0 4px 14px rgba(2, 4, 10, 0.52),
+    0 20px 50px rgba(2, 4, 10, 0.66);
+  --glow-accent: 0 0 22px rgba(238, 126, 44, 0.35);
+  --ring-focus: 238 126 44;
+}
+
+/* Transition douce au changement de thème (paint uniquement,
+   jamais sur le fond photo ni les éléments animés par keyframes) */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  .panel,
+  .panel-raised,
+  .panel-flat,
+  .tab-btn,
+  .tab-nav,
+  .chip,
+  .shop-item,
+  .icon-tile,
+  .stat-tile,
+  .list-row,
+  .btn,
+  .btn-primary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-icon,
+  .toast,
+  .progress-bar,
+  .progress-bar-fill,
+  .input,
+  .section-title,
+  .modal-backdrop,
+  .modal-card {
+    transition-property:
+      background-color,
+      background-image,
+      border-color,
+      color,
+      box-shadow,
+      fill,
+      stroke;
+    transition-duration: 280ms;
+    transition-timing-function: ease;
+  }
+}
+
 @layer base {
   html,
   body,
@@ -10,21 +174,42 @@
   }
 
   body {
-    @apply font-display text-slate-100 antialiased overflow-hidden;
-    background-color: #14100c;
+    @apply font-display antialiased overflow-hidden;
+    color: rgb(var(--text-2));
+    background-color: rgb(var(--bg-app));
   }
 
-  /* --- Fond : screenshot Minecraft flouté légèrement + voile sombre --- */
+  ::selection {
+    background: rgb(var(--accent) / 0.35);
+    color: rgb(var(--text-1));
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgb(var(--void) / 0.3);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--accent-strong) / 0.4);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--accent-strong) / 0.6);
+  }
+
+  /* --- Fond jour : screenshot Minecraft flouté + voile chaud --- */
   /* NB: pas de background-attachment:fixed — combiné à filter, c'est un bug
-     d'affichage connu de Chromium (fond qui disparaît). L'élément étant déjà
-     en position:fixed, le résultat est identique sans le bug. */
+     d'affichage connu de Chromium. L'élément étant déjà en position:fixed,
+     le résultat est identique sans le bug. */
   .app-bg::before {
     content: '';
     position: fixed;
     inset: 0;
     background: url('/background.png') center / cover no-repeat;
     filter: blur(4px);
-    transform: scale(1.05); /* évite les bords clairs dus au blur */
+    transform: scale(1.05);
     z-index: -2;
   }
   .app-bg::after {
@@ -40,12 +225,26 @@
     z-index: -1;
   }
 
-  /* --- Nuit (selon l'heure réelle) : teinte lunaire bleutée uniforme --- */
-  .app-bg.night::before {
+  /* --- Nuit : deux couches fixes aux filtres STATIQUES, crossfade en
+     opacité pure. Animer le filtre du ::before re-rastériserait le blur
+     à chaque frame ; ici le GPU compose des couches déjà rendues. --- */
+  .app-bg-night,
+  .app-bg-veil-night {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+  .app-bg-night {
+    z-index: -2;
+    background: url('/background.png') center / cover no-repeat;
     filter: blur(4px) brightness(0.42) sepia(0.6) hue-rotate(190deg)
       saturate(0.65);
+    transform: scale(1.05);
   }
-  .app-bg.night::after {
+  .app-bg-veil-night {
+    z-index: -1;
     background: linear-gradient(
       180deg,
       rgba(10, 14, 38, 0.8) 0%,
@@ -53,56 +252,721 @@
       rgba(3, 5, 16, 0.9) 100%
     );
   }
-
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-ember-700/40 rounded-full;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-ember-600/60;
+  .app-bg.night .app-bg-night,
+  .app-bg.night .app-bg-veil-night {
+    opacity: 1;
   }
 }
 
 @layer components {
-  /* Pas de backdrop-blur ici : c'est un filtre GPU coûteux sur de grandes
-     surfaces, surtout avec des animations derrière. Le fond opaque suffit. */
+  /* Pas de backdrop-blur ici : filtre GPU coûteux sur de grandes surfaces.
+     La profondeur vient de bordure + liseré interne + ombre. */
   .panel {
-    @apply rounded-2xl border border-white/10 bg-[#12100d]/80 shadow-xl shadow-black/40;
+    position: relative;
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--line) / 0.1);
+    background:
+      linear-gradient(
+        180deg,
+        rgb(var(--sheen) / 0.035),
+        rgb(var(--sheen) / 0) 120px
+      ),
+      linear-gradient(
+        180deg,
+        rgb(var(--panel-bg) / 0.92),
+        rgb(var(--panel-bg) / 0.86)
+      );
+    box-shadow: var(--shadow-2);
+    color: rgb(var(--text-2));
+  }
+  .panel-raised {
+    box-shadow: var(--shadow-3);
+    border-color: rgb(var(--line) / 0.13);
+  }
+  .panel-flat {
+    border: 1px solid rgb(var(--line) / 0.07);
+    background: rgb(var(--surface) / 0.04);
+    box-shadow: none;
   }
 
-  .btn {
-    @apply rounded-xl px-4 py-2 font-semibold transition-all duration-150 active:scale-95 select-none cursor-pointer;
+  /* --- Boutons --- */
+  /* La base est portée par TOUTES les variantes : un composant peut
+     écrire « btn-primary » seul (sans « btn ») et garde le padding. */
+  .btn,
+  .btn-primary,
+  .btn-ghost,
+  .btn-danger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease,
+      opacity 0.15s ease;
+  }
+  .btn:focus-visible,
+  .btn-primary:focus-visible,
+  .btn-ghost:focus-visible,
+  .btn-danger:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px rgb(var(--ring-focus) / 0.45),
+      var(--shadow-1);
+  }
+  .btn:active:not(:disabled),
+  .btn-primary:active:not(:disabled),
+  .btn-ghost:active:not(:disabled),
+  .btn-danger:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled,
+  .btn-primary:disabled,
+  .btn-ghost:disabled,
+  .btn-danger:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    box-shadow: none;
   }
 
   .btn-primary {
-    @apply btn bg-ember-600 text-white hover:bg-ember-500 shadow-lg shadow-ember-900/40;
+    color: #fff;
+    border: 1px solid rgb(var(--accent-strong));
+    background:
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.16),
+        rgb(255 255 255 / 0) 45%
+      ),
+      linear-gradient(180deg, rgb(var(--accent)), rgb(var(--accent-strong)));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      0 1px 2px rgb(var(--void) / 0.3),
+      0 4px 14px rgb(var(--accent-deep) / 0.35);
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.16),
+      rgb(255 255 255 / 0.03)
+    );
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+  }
+  .btn-primary:hover:not(:disabled) {
+    border-color: rgb(var(--accent));
+  }
+  .btn-primary:hover:not(:disabled)::after {
+    opacity: 1;
+  }
+  .btn-primary:active:not(:disabled) {
+    background: linear-gradient(
+      180deg,
+      rgb(var(--accent-strong)),
+      rgb(var(--accent-deep))
+    );
+    box-shadow:
+      inset 0 2px 4px rgb(var(--void) / 0.3),
+      0 1px 2px rgb(var(--accent-deep) / 0.4);
   }
 
   .btn-ghost {
-    @apply btn bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10;
+    color: rgb(var(--text-2));
+    border: 1px solid rgb(var(--line) / 0.12);
+    background: rgb(var(--surface) / 0.06);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 1px 2px rgb(var(--void) / 0.2);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    color: rgb(var(--text-1));
+    border-color: rgb(var(--accent) / 0.35);
+    background: rgb(var(--surface) / 0.1);
+  }
+  .btn-ghost:active:not(:disabled) {
+    box-shadow: inset 0 2px 4px rgb(var(--void) / 0.25);
   }
 
+  .btn-danger {
+    color: #fff;
+    border: 1px solid rgb(var(--danger-strong));
+    background:
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.14),
+        rgb(255 255 255 / 0) 45%
+      ),
+      linear-gradient(180deg, rgb(var(--danger-strong)), rgb(220 38 38));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.18),
+      0 4px 14px rgb(var(--danger-deep) / 0.45);
+  }
+  .btn-danger:active:not(:disabled) {
+    box-shadow: inset 0 2px 4px rgb(var(--void) / 0.3);
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    color: rgb(var(--text-2));
+    background: rgb(var(--surface) / 0.06);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .btn-icon:hover {
+    color: rgb(var(--text-1));
+    background: rgb(var(--surface) / 0.12);
+    border-color: rgb(var(--line) / 0.12);
+  }
+  .btn-icon:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(var(--ring-focus) / 0.45);
+  }
+  .btn-icon:disabled,
+  .btn-icon.is-off {
+    color: rgb(var(--text-4));
+    opacity: 0.6;
+  }
+
+  /* --- Onglets --- */
+  .tab-nav {
+    display: flex;
+    gap: 0.25rem;
+    border-radius: 0.75rem;
+    padding: 0.25rem;
+    background: rgb(var(--void) / 0.35);
+    box-shadow: inset 0 1px 2px rgb(var(--void) / 0.4);
+  }
   .tab-btn {
-    @apply rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap text-slate-300 transition-colors cursor-pointer hover:text-white;
+    position: relative;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: rgb(var(--text-3));
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .tab-btn:hover {
+    color: rgb(var(--text-1));
+    background: rgb(var(--surface) / 0.05);
+  }
+  .tab-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(var(--ring-focus) / 0.45);
   }
   .tab-btn-active {
-    @apply bg-ember-600/90 text-white shadow-md shadow-ember-900/50 hover:text-white;
+    color: #fff;
+    background:
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.14),
+        rgb(255 255 255 / 0) 50%
+      ),
+      linear-gradient(
+        180deg,
+        rgb(var(--accent) / 0.96),
+        rgb(var(--accent-strong) / 0.96)
+      );
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.18),
+      0 2px 8px rgb(var(--accent-deep) / 0.5);
+  }
+  .tab-btn-active::after {
+    content: '';
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.75);
+    box-shadow: 0 0 8px rgb(255 255 255 / 0.45);
+  }
+
+  /* --- Lignes de liste (boutique, améliorations, équipe…) --- */
+  .list-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--line) / 0.1);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--surface) / 0.05),
+      rgb(var(--surface) / 0.02)
+    );
+    padding: 0.75rem;
+    text-align: left;
   }
 
   .shop-item {
-    @apply flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition-all duration-150;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    text-align: left;
+    border: 1px solid rgb(var(--line) / 0.1);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--surface) / 0.05),
+      rgb(var(--surface) / 0.02)
+    );
+    box-shadow: var(--shadow-1);
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.12s ease,
+      opacity 0.15s ease,
+      filter 0.15s ease;
   }
   .shop-item-affordable {
-    @apply border-ember-500/40 bg-ember-950/30 hover:bg-ember-900/30 hover:border-ember-400/60 cursor-pointer;
+    border-color: rgb(var(--accent) / 0.38);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--accent-overlay) / 0.32),
+      rgb(var(--accent-overlay) / 0.14)
+    );
+    cursor: pointer;
+  }
+  .shop-item-affordable:hover {
+    border-color: rgb(var(--accent) / 0.6);
+    transform: translateY(-1px);
+    box-shadow:
+      0 4px 12px rgb(var(--accent-deep) / 0.28),
+      var(--shadow-1);
+  }
+  .shop-item-affordable:active {
+    transform: translateY(0);
   }
   .shop-item-locked {
-    @apply opacity-50;
+    opacity: 0.55;
+    filter: saturate(0.75);
+    cursor: not-allowed;
+  }
+  .shop-item-owned {
+    border-color: rgb(var(--success) / 0.4);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--success-deep) / 0.5),
+      rgb(var(--success-deep) / 0.25)
+    );
+  }
+  .shop-item-selected {
+    border-color: rgb(var(--accent) / 0.6);
+    box-shadow:
+      0 0 0 2px rgb(var(--accent) / 0.25),
+      var(--shadow-1);
+  }
+
+  /* --- Chips & badges --- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--line) / 0.15);
+    padding: 0.125rem 0.5rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: rgb(var(--text-2));
+    background: rgb(var(--surface) / 0.07);
+  }
+  .chip-accent {
+    border-color: rgb(var(--accent) / 0.4);
+    color: rgb(var(--accent-text));
+    background: rgb(var(--accent-overlay) / 0.4);
+  }
+  .chip-success {
+    border-color: rgb(var(--success) / 0.4);
+    color: rgb(var(--success-bright));
+    background: rgb(var(--success-deep) / 0.45);
+  }
+  .chip-warning {
+    border-color: rgb(var(--warning) / 0.4);
+    color: rgb(var(--warning-bright));
+    background: rgb(var(--warning) / 0.1);
+  }
+  .chip-danger {
+    border-color: rgb(var(--danger) / 0.45);
+    color: rgb(var(--danger-bright));
+    background: rgb(var(--danger-deep) / 0.45);
+  }
+  .chip-storm {
+    border-color: rgb(var(--storm) / 0.45);
+    color: rgb(var(--storm-bright));
+    background: rgb(var(--storm) / 0.1);
+  }
+  .chip-info {
+    border-color: rgb(var(--info) / 0.45);
+    color: rgb(var(--info));
+    background: rgb(var(--info) / 0.1);
+  }
+
+  /* --- Raretés --- */
+  .badge-rarity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--rc) / 0.55);
+    padding: 0.125rem 0.5rem;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--rc));
+    background: rgb(var(--rc) / 0.12);
+  }
+  .rarity-commun {
+    --rc: var(--rarity-commun);
+  }
+  .rarity-rare {
+    --rc: var(--rarity-rare);
+  }
+  .rarity-epique {
+    --rc: var(--rarity-epique);
+  }
+  .rarity-legendaire {
+    --rc: var(--rarity-legendaire);
+  }
+  .rarity-card {
+    --rc: var(--rarity-commun);
+    border: 2px solid rgb(var(--rc));
+    border-radius: 0.75rem;
+    background: linear-gradient(
+      180deg,
+      rgb(var(--rc) / 0.14),
+      rgb(var(--void) / 0.55)
+    );
+    box-shadow: inset 0 0 24px rgb(var(--rc) / 0.18);
+  }
+  .rarity-card-glow {
+    box-shadow:
+      inset 0 0 24px rgb(var(--rc) / 0.18),
+      0 0 18px rgb(var(--rc) / 0.3);
+  }
+  .rarity-text {
+    color: rgb(var(--rc));
+  }
+  .rarity-wash {
+    background: rgb(var(--rc) / 0.06);
+  }
+  .rarity-glow-text {
+    color: rgb(var(--rc));
+    text-shadow: 0 0 16px rgb(var(--rc) / 0.55);
+  }
+
+  /* --- Stats, jauges, tuiles --- */
+  .stat-value {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
+    color: rgb(var(--accent-display));
+    text-shadow:
+      0 2px 4px rgb(var(--void) / 0.55),
+      0 0 20px rgb(var(--accent) / 0.3);
+  }
+
+  .progress-bar {
+    height: 0.5rem;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgb(var(--void) / 0.45);
+    box-shadow: inset 0 1px 2px rgb(var(--void) / 0.35);
+  }
+  .progress-bar-fill {
+    position: relative;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--accent-strong) / 0.8),
+      rgb(var(--accent) / 0.85)
+    );
+    box-shadow: 0 0 8px rgb(var(--accent) / 0.35);
+    transition:
+      width 0.3s ease,
+      background 0.3s ease;
+  }
+  .progress-bar-fill.is-complete {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--success) / 0.8),
+      rgb(var(--success-bright) / 0.9)
+    );
+    box-shadow: 0 0 8px rgb(var(--success) / 0.4);
+  }
+  .progress-bar-fill.is-shiny::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 40%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.35),
+      transparent
+    );
+    animation: bar-shine 2.4s ease-in-out infinite;
+  }
+
+  .stat-tile {
+    border-radius: 0.5rem;
+    border: 1px solid rgb(var(--line) / 0.07);
+    padding: 0.375rem 0.5rem;
+    font-size: 12px;
+    color: rgb(var(--text-3));
+    background: rgb(var(--surface) / 0.06);
+  }
+  .stat-tile-value {
+    font-weight: 600;
+    color: rgb(var(--text-2));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .icon-tile {
+    display: flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    font-size: 1.5rem;
+    background: rgb(var(--void) / 0.4);
+    box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.1);
+  }
+
+  /* --- Métriques du cockpit --- */
+  .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    padding: 0.625rem 0;
+    text-align: center;
+  }
+  .metric-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgb(var(--text-3));
+  }
+  .metric-value {
+    font-size: 0.875rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: rgb(var(--text-1));
+  }
+
+  /* --- Modales --- */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background:
+      radial-gradient(
+        120% 120% at 50% 0%,
+        rgb(var(--void) / 0.5),
+        rgb(var(--void) / 0.8)
+      ),
+      rgb(0 0 0 / 0.55);
+    animation: fade-in 0.18s ease-out;
+  }
+  .modal-card {
+    display: flex;
+    max-height: 90vh;
+    width: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--line) / 0.12);
+    background:
+      linear-gradient(
+        180deg,
+        rgb(var(--sheen) / 0.045),
+        rgb(var(--sheen) / 0) 140px
+      ),
+      linear-gradient(
+        180deg,
+        rgb(var(--panel-bg) / 0.97),
+        rgb(var(--panel-bg) / 0.94)
+      );
+    box-shadow: var(--shadow-3);
+    animation: modal-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+    color: rgb(var(--text-2));
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgb(var(--line) / 0.1);
+    padding: 0.75rem;
+  }
+  .modal-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--accent-text));
+  }
+  .modal-x {
+    display: flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: rgb(var(--text-3));
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+  }
+  .modal-x:hover {
+    color: rgb(var(--text-1));
+    background: rgb(var(--surface) / 0.1);
+  }
+  .modal-x:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(var(--ring-focus) / 0.45);
+  }
+  .modal-body {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+  .modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    border-top: 1px solid rgb(var(--line) / 0.1);
+    background: rgb(var(--void) / 0.2);
+    padding: 0.75rem;
+  }
+
+  /* --- Formulaires & divers --- */
+  .input {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--line) / 0.14);
+    background: rgb(var(--void) / 0.4);
+    padding: 0.625rem 0.75rem;
+    color: rgb(var(--text-1));
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .input::placeholder {
+    color: rgb(var(--text-4));
+  }
+  .input:focus {
+    border-color: rgb(var(--accent) / 0.6);
+    box-shadow: 0 0 0 3px rgb(var(--accent) / 0.18);
+  }
+
+  .section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--text-3));
+  }
+  .label-caps {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgb(var(--text-3));
+  }
+
+  .empty-state {
+    border: 1px dashed rgb(var(--line) / 0.14);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    text-align: center;
+    color: rgb(var(--text-4));
+  }
+
+  .spinner {
+    height: 2rem;
+    width: 2rem;
+    border-radius: 999px;
+    border: 2px solid rgb(var(--accent) / 0.3);
+    border-top-color: rgb(var(--accent));
+    animation: ec-spin 0.8s linear infinite;
+  }
+
+  .toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--accent) / 0.4);
+    border-left: 3px solid rgb(var(--accent) / 0.7);
+    padding: 0.75rem;
+    background: linear-gradient(
+      180deg,
+      rgb(var(--accent-overlay) / 0.55),
+      rgb(var(--panel-bg) / 0.95)
+    );
+    box-shadow: var(--shadow-3);
+    animation: toast-in 0.35s ease-out forwards;
+  }
+  .toast-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: rgb(var(--accent-text-strong));
   }
 
   /* Têtes Minecraft nettes (pixel art) */
@@ -114,16 +978,21 @@
 @layer utilities {
   .text-glow {
     text-shadow:
-      0 0 18px rgba(251, 129, 19, 0.55),
-      0 2px 4px rgba(0, 0, 0, 0.8);
+      0 0 18px rgb(var(--accent) / 0.5),
+      0 2px 4px rgb(var(--void) / 0.8);
+  }
+  .text-glow-success {
+    text-shadow:
+      0 0 16px rgb(var(--success) / 0.45),
+      0 2px 4px rgb(var(--void) / 0.8);
   }
 
   .shine-text {
     background: linear-gradient(
       110deg,
-      #ffd9a3 20%,
+      rgb(var(--accent-text-strong)) 20%,
       #fff 40%,
-      #ffd9a3 60%
+      rgb(var(--accent-text-strong)) 60%
     );
     background-size: 200% auto;
     -webkit-background-clip: text;
@@ -131,38 +1000,287 @@
     color: transparent;
     animation: shimmer 3s linear infinite;
   }
+
+  /* Focus visible universel pour les interactifs sans classe dédiée */
+  .focus-ring {
+    border-radius: 0.5rem;
+  }
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--ring-focus) / 0.9);
+  }
+
+  /* Masque la scrollbar des navs scrollables */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-/* ============ Effets du jeu ============ */
+/* ============================================================
+   Effets du jeu — keyframes en opacity/transform uniquement
+   ============================================================ */
 
-/* Pièce EndoCraft */
-@keyframes coin-press-anim {
-  0% { transform: scale(1); }
-  35% { transform: scale(0.92); }
-  70% { transform: scale(1.04); }
-  100% { transform: scale(1); }
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes modal-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes bar-shine {
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+@keyframes ec-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Courbes V2 --- */
+:root {
+  --ec-ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ec-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ec-ease-reel: cubic-bezier(0.12, 0.68, 0.04, 1);
+}
+
+/* --- La pièce : pression « squish + contre-rotation » --- */
+@keyframes ec-coin-squish {
+  0% {
+    transform: scale(1, 1) rotate(0deg);
+  }
+  30% {
+    transform: scale(0.9, 1.06) rotate(-2.5deg);
+  }
+  58% {
+    transform: scale(1.06, 0.95) rotate(1.8deg);
+  }
+  80% {
+    transform: scale(0.985, 1.015) rotate(-0.6deg);
+  }
+  100% {
+    transform: scale(1, 1) rotate(0deg);
+  }
 }
 .coin-press {
-  animation: coin-press-anim 0.35s ease-out;
+  animation: ec-coin-squish 0.32s var(--ec-ease-pop);
 }
 /* Boost actif : logo légèrement surexposé plutôt qu'un halo carré */
 .coin-boosted {
   filter: brightness(1.18) saturate(1.25);
 }
 
-/* Halo pulsant derrière le logo (opacité seule : pas de re-rastérisation
-   du flou à chaque frame, contrairement à une animation de scale) */
+/* --- Halo qui respire (transform sur le wrapper, le blur interne
+       reste dans sa couche : zéro re-rastérisation du filtre) --- */
+@keyframes ec-halo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(1.1);
+  }
+  62% {
+    transform: scale(1.06);
+  }
+}
+.ec-halo-breathe {
+  animation: ec-halo-breathe 2.6s ease-in-out infinite;
+}
+
 @keyframes halo-pulse-anim {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .halo-pulse {
   animation: halo-pulse-anim 2.6s ease-in-out infinite;
 }
 
+/* --- Micro-flottement d'inactivité de la pièce --- */
+@keyframes ec-coin-idle {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-0.4deg);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0) rotate(0.4deg);
+  }
+}
+.ec-coin-idle {
+  animation: ec-coin-idle 5.2s ease-in-out infinite;
+}
 
+/* --- Lueur qui suit la souris (déplacement transform seul) --- */
+.ec-mouse-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--accent-text-strong) / 0.26) 0%,
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+  pointer-events: none;
+  will-change: transform;
+}
+.ec-mouse-glow.on {
+  opacity: 1;
+}
 
-/* Onde de choc */
+/* --- Pièce en frénésie --- */
+@keyframes ec-frenzy-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+@keyframes ec-frenzy-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes ec-sheen {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.7;
+  }
+  60% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(140%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+.ec-coin-frenzy {
+  animation: ec-frenzy-pulse 0.9s ease-in-out infinite;
+}
+.ec-coin-frenzy::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  box-shadow:
+    0 0 34px 6px rgb(var(--accent) / 0.55),
+    inset 0 0 22px rgb(var(--accent-text-strong) / 0.25);
+  animation: ec-frenzy-glow 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+.ec-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ec-sheen::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 34%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 243 196 / 0.5),
+    transparent
+  );
+  animation: ec-sheen 1.8s ease-in-out infinite;
+}
+
+/* --- Pièce en tempête d'ombre --- */
+@keyframes ec-shadow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+.ec-coin-shadow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--rarity-rare) / 0.3) 0%,
+    rgb(46 16 86 / 0.5) 100%
+  );
+  animation: ec-shadow-pulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.ec-shadow-mode .halo-pulse {
+  background-color: rgb(var(--rarity-rare) / 0.32) !important;
+}
+.ec-shadow-mode .ripple {
+  border-color: rgb(var(--storm) / 0.85) !important;
+}
+
+/* --- Ondes de choc --- */
 @keyframes ripple-anim {
   0% {
     transform: translate(-50%, -50%) scale(1);
@@ -180,7 +1298,7 @@
   width: 100%;
   height: 100%;
   border-radius: 9999px;
-  border: 3px solid rgba(255, 192, 107, 0.8);
+  border: 3px solid rgb(var(--accent-text) / 0.8);
   transform: translate(-50%, -50%) scale(1);
   animation: ripple-anim 0.6s ease-out forwards;
   pointer-events: none;
@@ -202,36 +1320,413 @@
   animation: ripple-auto-anim 0.6s ease-out forwards;
 }
 
-/* Pommes de pluie : tombent du haut de l'écran en tournant */
+/* --- Pommes de pluie : chute avec oscillation --- */
 @keyframes rain-fall-anim {
   0% {
-    transform: translateY(-64px) rotate(0deg);
+    transform: translate3d(0, -64px, 0) rotate(0deg);
     opacity: 0;
   }
   8% {
     opacity: 1;
   }
+  25% {
+    transform: translate3d(14px, 25vh, 0) rotate(85deg);
+  }
+  50% {
+    transform: translate3d(-12px, 52vh, 0) rotate(170deg);
+  }
+  75% {
+    transform: translate3d(10px, 80vh, 0) rotate(255deg);
+  }
   100% {
-    transform: translateY(105vh) rotate(340deg);
+    transform: translate3d(-2px, 105vh, 0) rotate(340deg);
     opacity: 1;
   }
 }
 .rain-apple {
   position: fixed;
   top: 0;
-  z-index: 40;
-  padding: 6px; /* zone de clic confortable */
+  z-index: 70;
+  padding: 10px; /* zone tactile confortable */
   cursor: pointer;
   background: none;
   border: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
   animation: rain-fall-anim linear forwards;
 }
 
-/* Nombres flottants "+X" */
+/* --- Pomme dorée : apparition / capture --- */
+@keyframes ec-apple-spawn {
+  0% {
+    transform: scale(0) rotate(-30deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.18) rotate(6deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+@keyframes ec-apple-pop {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+@keyframes ec-apple-ring {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.ec-apple-spawn {
+  animation: ec-apple-spawn 0.38s var(--ec-ease-pop) both;
+}
+.ec-apple-pop {
+  animation: ec-apple-pop 0.32s ease-out forwards;
+}
+.ec-apple-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 3px solid rgb(var(--warning) / 0.9);
+  animation: ec-apple-ring 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+/* --- Vignette de tempête d'ombre : gradient statique,
+       animation d'opacité uniquement (compositor) --- */
+@keyframes ec-storm-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes ec-storm-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+.ec-storm-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    transparent 52%,
+    rgb(46 16 86 / 0.34) 78%,
+    rgb(20 6 40 / 0.6) 100%
+  );
+  animation:
+    ec-storm-in 0.6s ease-out both,
+    ec-storm-pulse 1.6s ease-in-out 0.6s infinite;
+}
+
+/* --- Feedback d'achat --- */
+@keyframes ec-row-flash {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ec-icon-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.28) rotate(-4deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes ec-count-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.ec-flash::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 2px solid rgb(var(--accent) / 0.9);
+  box-shadow:
+    0 0 18px rgb(var(--accent) / 0.35),
+    inset 0 0 24px rgb(var(--accent) / 0.18);
+  opacity: 0;
+  pointer-events: none;
+}
+.ec-flash.is-flashing::after {
+  animation: ec-row-flash 0.45s ease-out 1;
+}
+.ec-icon-pop {
+  animation: ec-icon-pop 0.32s var(--ec-ease-pop);
+}
+.ec-count-bump {
+  display: inline-block;
+  animation: ec-count-bump 0.28s var(--ec-ease-pop);
+}
+
+/* --- Flash du solde (gains importants uniquement) --- */
+@keyframes ec-balance-flash {
+  0% {
+    color: #fff3c4;
+    text-shadow:
+      0 0 24px rgb(var(--accent-text-strong) / 0.85),
+      0 2px 4px rgb(var(--void) / 0.8);
+  }
+  100% {
+    color: rgb(var(--accent-display));
+    text-shadow:
+      0 0 18px rgb(var(--accent) / 0.55),
+      0 2px 4px rgb(var(--void) / 0.8);
+  }
+}
+.ec-balance-flash {
+  animation: ec-balance-flash 0.45s ease-out;
+}
+
+/* --- Transition d'onglet --- */
+/* NB : l'état final doit être `transform: none` — un transform persistant
+   (fill-mode both) transformerait ce conteneur en bloc conteneur pour
+   tous ses descendants `position: fixed` : les modales ouvertes dans un
+   onglet se retrouveraient coincées dans le panneau au lieu de couvrir
+   l'écran. */
+@keyframes ec-tab-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ec-tab-enter {
+  animation: ec-tab-enter 0.18s var(--ec-ease-out) both;
+}
+
+/* --- Caisses : atterrissage, révélation, jackpot --- */
+@keyframes ec-reel-shake {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  18% {
+    transform: translate3d(-4px, 1px, 0);
+  }
+  36% {
+    transform: translate3d(3px, -1px, 0);
+  }
+  54% {
+    transform: translate3d(-2px, 0, 0);
+  }
+  72% {
+    transform: translate3d(1px, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes ec-win-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes ec-glow-blink {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ec-rarity-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.32;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ec-reveal-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+.ec-reel-land {
+  animation: ec-reel-shake 0.38s ease-out;
+}
+.ec-win-flash {
+  animation: ec-win-bump 0.55s var(--ec-ease-pop);
+}
+.ec-win-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  opacity: 0;
+  border: 2px solid var(--ec-win-c, rgb(var(--rarity-legendaire)));
+  box-shadow: 0 0 28px var(--ec-win-c, rgb(var(--rarity-legendaire)));
+  pointer-events: none;
+}
+.ec-win-glow.is-on {
+  animation: ec-glow-blink 0.65s ease-out 1;
+}
+.ec-rarity-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--ec-win-c, rgb(var(--rarity-legendaire)));
+  animation: ec-rarity-flash 0.5s ease-out forwards;
+}
+.ec-reveal-in {
+  opacity: 0;
+  animation: ec-reveal-in 0.32s var(--ec-ease-out) both;
+}
+
+/* --- Toasts : entrée / sortie --- */
+@keyframes ec-toast-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(48px, 0, 0) scale(0.96);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(-4px, 0, 0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes ec-toast-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(28px, -6px, 0) scale(0.96);
+  }
+}
+.ec-toast-in {
+  animation: ec-toast-in 0.3s var(--ec-ease-out) both;
+}
+.ec-toast-out {
+  position: absolute;
+  right: 0;
+  width: 100%;
+  animation: ec-toast-out 0.2s ease-in forwards;
+}
+
+/* --- Le moment Renaissance --- */
+@keyframes ec-ren-flash {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ec-mult-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  75% {
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes ec-icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+.ec-ren-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    #fff3c4 0%,
+    rgb(var(--accent)) 60%,
+    transparent 100%
+  );
+  animation: ec-ren-flash 0.6s ease-out forwards;
+}
+.ec-mult-pop {
+  animation: ec-mult-pop 0.7s var(--ec-ease-pop) both;
+}
+.ec-icon-pulse {
+  animation: ec-icon-pulse 1.8s ease-in-out infinite;
+}
+
+/* --- Nombres flottants « +X » : pop-in au départ --- */
 @keyframes float-number-anim {
   0% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translate(-50%, 0) scale(0.7);
+  }
+  18% {
+    transform: translate(-50%, -14px) scale(1);
   }
   100% {
     opacity: 0;
@@ -243,8 +1738,103 @@
   z-index: 45;
   font-weight: 800;
   font-size: 1.25rem;
-  color: #ffd9a3;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--accent-text-strong));
+  text-shadow: 0 2px 6px rgb(var(--void) / 0.8);
   pointer-events: none;
   animation: float-number-anim 1s ease-out forwards;
+}
+.ec-float-frenzy {
+  font-size: 1.6rem;
+  color: #fff3c4 !important;
+}
+.ec-float-mini {
+  font-size: 0.95rem;
+}
+.ec-float-shadow {
+  color: rgb(var(--storm-bright)) !important;
+}
+
+/* ============================================================
+   prefers-reduced-motion : on coupe la décoration, on garde
+   les feedbacks essentiels (en fondu seul)
+   ============================================================ */
+@keyframes ec-fade-only {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes ec-rain-straight {
+  0% {
+    transform: translate3d(0, -64px, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 105vh, 0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halo-pulse,
+  .ec-halo-breathe,
+  .ec-coin-idle,
+  .ec-coin-frenzy,
+  .ec-coin-frenzy::after,
+  .ec-sheen::before,
+  .ec-coin-shadow::after,
+  .ec-icon-pulse,
+  .shine-text,
+  .ec-storm-vignette,
+  .animate-apple-bob,
+  .animate-pulse,
+  .animate-spin,
+  .spinner {
+    animation: none !important;
+  }
+  .shine-text {
+    color: rgb(var(--accent-text-strong));
+    -webkit-text-fill-color: rgb(var(--accent-text-strong));
+  }
+  .ec-storm-vignette {
+    opacity: 0.65;
+  }
+  .coin-press {
+    animation: ec-fade-only 0.15s ease-out !important;
+  }
+  .ripple,
+  .ripple-auto {
+    animation: ec-fade-only 0.3s ease-out forwards !important;
+  }
+  .ec-tab-enter,
+  .ec-reveal-in,
+  .ec-toast-in,
+  .ec-toast-out,
+  .ec-apple-spawn,
+  .ec-apple-pop,
+  .ec-win-flash,
+  .ec-reel-land,
+  .modal-card,
+  .modal-backdrop {
+    animation: ec-fade-only 0.15s ease-out both !important;
+  }
+  .ec-reveal-in {
+    animation-delay: 0ms !important;
+  }
+  .rain-apple {
+    animation: ec-rain-straight linear forwards !important;
+  }
+  .float-number {
+    animation: ec-fade-only 0.6s ease-out forwards !important;
+  }
+  .app-bg-night,
+  .app-bg-veil-night {
+    transition: none !important;
+  }
 }

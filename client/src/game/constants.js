@@ -1,12 +1,21 @@
 // ============================================================
-// EndoClicker — définitions du jeu
+// EndoClicker — définitions du jeu (V2)
 // (générateurs, améliorations, succès, pomme dorée)
 // ============================================================
 
+import { fmt } from './format.js';
+
 export const COST_FACTOR = 1.15;
+
+// Part de la production qui s'ajoute à la puissance de clic.
+// Les multiplicateurs de clic (staff, exclusives) ne s'appliquent
+// QU'aux pioches : sinon le clic devient la stratégie dominante.
+export const CLICK_PRODUCTION_SHARE = 0.05;
 
 // ---------- Générateurs (production passive d'EndoCraft) ----------
 // Textures : Pixel Perfection CE (CC BY-SA 4.0) — voir client/public/textures/
+// Courbe V2 : payback 1er achat de 30 s (bûcheron) à ~12 min (shulker),
+// puis redescente (cœur 750 s) — les paliers ×60 font le reste.
 export const GENERATORS = [
   {
     id: 'bucheron',
@@ -29,7 +38,7 @@ export const GENERATORS = [
     name: 'Pêcheur automatique',
     icon: '/textures/fishing_rod.png',
     baseCost: 1_100,
-    baseRate: 8,
+    baseRate: 12,
     desc: 'Remonte des trésors au bout de sa canne à pêche infinie.',
   },
   {
@@ -37,7 +46,7 @@ export const GENERATORS = [
     name: 'Ferme à mobs',
     icon: '/textures/rotten_flesh.png',
     baseCost: 12_000,
-    baseRate: 47,
+    baseRate: 66,
     desc: 'Une exploitation bien rodée… et parfaitement légale.',
   },
   {
@@ -45,7 +54,7 @@ export const GENERATORS = [
     name: 'Villageois trader',
     icon: '/textures/emerald.png',
     baseCost: 130_000,
-    baseRate: 260,
+    baseRate: 390,
     desc: 'Hhhmm. Il revend tout, toujours plus cher.',
   },
   {
@@ -53,7 +62,7 @@ export const GENERATORS = [
     name: 'Golem de fer',
     icon: '/textures/iron_ingot.png',
     baseCost: 1.4e6,
-    baseRate: 1_400,
+    baseRate: 2_000,
     desc: 'Imposant, loyal, et étonnamment doué pour le commerce.',
   },
   {
@@ -61,7 +70,7 @@ export const GENERATORS = [
     name: 'Portail du Nether',
     icon: '/textures/obsidian.png',
     baseCost: 2e7,
-    baseRate: 7_800,
+    baseRate: 17_400,
     desc: 'Le nectar du Nether se monnaie très cher.',
   },
   {
@@ -69,7 +78,7 @@ export const GENERATORS = [
     name: 'Mineur du Deep Dark',
     icon: '/textures/diamond.png',
     baseCost: 3.3e8,
-    baseRate: 44_000,
+    baseRate: 4.4e5,
     desc: 'Il extrait en silence… surtout ne réveillez pas le Warden.',
   },
   {
@@ -77,7 +86,7 @@ export const GENERATORS = [
     name: 'Portail de l’End',
     icon: '/textures/ender_eye.png',
     baseCost: 5.1e9,
-    baseRate: 260_000,
+    baseRate: 5.6e6,
     desc: 'Un passage direct vers les cités de l’End.',
   },
   {
@@ -85,7 +94,7 @@ export const GENERATORS = [
     name: 'Ender Dragon',
     icon: '/textures/dragon_egg.png',
     baseCost: 7.5e10,
-    baseRate: 1.6e6,
+    baseRate: 7.5e7,
     desc: 'Apprivoisé, il garde jalousement votre trésor.',
   },
   {
@@ -93,7 +102,7 @@ export const GENERATORS = [
     name: 'Shulker de l’End',
     icon: '/textures/shulker_shell.png',
     baseCost: 8e11,
-    baseRate: 1.2e7,
+    baseRate: 8e8,
     desc: 'Sa boîte contient plus d’EndoCraft que l’univers lui-même.',
   },
   {
@@ -101,7 +110,7 @@ export const GENERATORS = [
     name: 'Wither dompté',
     icon: '/textures/nether_star.png',
     baseCost: 1e13,
-    baseRate: 1.6e8,
+    baseRate: 1.06e10,
     desc: 'Trois têtes valent mieux qu’une.',
   },
   {
@@ -109,7 +118,7 @@ export const GENERATORS = [
     name: 'Balise de l’Infini',
     icon: '/textures/beacon.png',
     baseCost: 1.2e14,
-    baseRate: 2e9,
+    baseRate: 7e10,
     desc: 'Son rayon transmue la bedrock en EndoCraft.',
   },
   {
@@ -117,7 +126,7 @@ export const GENERATORS = [
     name: 'Trident légendaire',
     icon: '/textures/trident.png',
     baseCost: 1.5e15,
-    baseRate: 2.5e10,
+    baseRate: 1.1e12,
     desc: 'Arraché à un Guardian, il canalise la foudre… et les pépites.',
   },
   {
@@ -125,7 +134,7 @@ export const GENERATORS = [
     name: 'Totem d’immortalité',
     icon: '/textures/totem_of_undying.png',
     baseCost: 2e16,
-    baseRate: 3.2e11,
+    baseRate: 2e13,
     desc: 'Il ramène votre fortune d’entre les morts. Indéfiniment.',
   },
   {
@@ -133,36 +142,36 @@ export const GENERATORS = [
     name: 'Cœur de l’Ancien',
     icon: '/textures/heart_of_the_sea.png',
     baseCost: 3e17,
-    baseRate: 4.5e12,
+    baseRate: 4e14,
     desc: 'Battez au rythme de l’océan primordial. Chaque pulsation paie.',
   },
 ];
 
 // ---------- Améliorations de clic (paliers de pioches) ----------
 export const CLICK_UPGRADES = [
-  { id: 'pick-bois', name: 'Pioche en bois', icon: '/textures/wooden_pickaxe.png', cost: 100, mult: 2, desc: 'L’essentiel pour débuter.' },
-  { id: 'pick-pierre', name: 'Pioche en pierre', icon: '/textures/stone_pickaxe.png', cost: 1_000, mult: 2, desc: 'Un cran au-dessus.' },
-  { id: 'pick-fer', name: 'Pioche en fer', icon: '/textures/iron_pickaxe.png', cost: 12_000, mult: 2, desc: 'Solide et fiable.' },
-  { id: 'pick-diamant', name: 'Pioche en diamant', icon: '/textures/diamond_pickaxe.png', cost: 150_000, mult: 2, desc: 'Brille de mille éclats.' },
-  { id: 'pick-netherite', name: 'Pioche en netherite', icon: '/textures/netherite_pickaxe.png', cost: 2e6, mult: 3, desc: 'L’arme ultime du mineur.' },
-  { id: 'ench-efficacite', name: 'Enchantement Efficacité V', icon: '/textures/enchanted_book.png', cost: 5e7, mult: 3, desc: 'Vos clics deviennent fulgurants.' },
-  { id: 'ench-fortune', name: 'Enchantement Fortune III', icon: '/textures/experience_bottle.png', cost: 1e9, mult: 4, desc: 'Chaque clic rapporte une fortune.' },
-  { id: 'ench-mending', name: 'Enchantement Mending', icon: '/textures/redstone.png', cost: 1e11, mult: 3, desc: 'Vos clics se réparent en vous enrichissant.' },
-  { id: 'griffe-wither', name: 'Griffe du Wither', icon: '/textures/nether_star.png', cost: 1e13, mult: 3, desc: 'Arrachée du boss lui-même. Ça griffe fort.' },
+  { id: 'pick-bois', name: 'Pioche en bois', icon: '/textures/wooden_pickaxe.png', cost: 150, mult: 2, desc: 'L’essentiel pour débuter.' },
+  { id: 'pick-pierre', name: 'Pioche en pierre', icon: '/textures/stone_pickaxe.png', cost: 1_500, mult: 2, desc: 'Un cran au-dessus.' },
+  { id: 'pick-fer', name: 'Pioche en fer', icon: '/textures/iron_pickaxe.png', cost: 2e4, mult: 2, desc: 'Solide et fiable.' },
+  { id: 'pick-diamant', name: 'Pioche en diamant', icon: '/textures/diamond_pickaxe.png', cost: 3e5, mult: 2, desc: 'Brille de mille éclats.' },
+  { id: 'pick-netherite', name: 'Pioche en netherite', icon: '/textures/netherite_pickaxe.png', cost: 5e6, mult: 3, desc: 'L’arme ultime du mineur.' },
+  { id: 'ench-efficacite', name: 'Enchantement Efficacité V', icon: '/textures/enchanted_book.png', cost: 1e8, mult: 3, desc: 'Vos clics deviennent fulgurants.' },
+  { id: 'ench-fortune', name: 'Enchantement Fortune III', icon: '/textures/experience_bottle.png', cost: 2e9, mult: 4, desc: 'Chaque clic rapporte une fortune.' },
+  { id: 'ench-mending', name: 'Enchantement Mending', icon: '/textures/redstone.png', cost: 5e10, mult: 4, desc: 'Vos clics se réparent en vous enrichissant.' },
+  { id: 'griffe-wither', name: 'Griffe du Wither', icon: '/textures/nether_star.png', cost: 5e12, mult: 4, desc: 'Arrachée du boss lui-même. Ça griffe fort.' },
 ];
 
 // ---------- Overclocks (auto-clicker d'Emmanuel2403) ----------
 export const AUTO_CLICK_UPGRADES = [
-  { id: 'overclock-1', kind: 'autoClick', name: 'Overclock I', icon: '/textures/repeater.png', cost: 1e9, autoClickBonus: 1, desc: 'Auto-clicker : 3 clics/s au lieu de 2.' },
-  { id: 'overclock-2', kind: 'autoClick', name: 'Overclock II', icon: '/textures/blaze_powder.png', cost: 1e11, autoClickBonus: 2, desc: 'Auto-clicker : 5 clics/s cumulés.' },
-  { id: 'overclock-3', kind: 'autoClick', name: 'Overclock III', icon: '/textures/beacon.png', cost: 1e13, autoClickBonus: 3, desc: 'Auto-clicker : 8 clics/s cumulés. La machine est chaude.' },
+  { id: 'overclock-1', kind: 'autoClick', name: 'Overclock I', icon: '/textures/repeater.png', cost: 1e9, autoClickBonus: 1, desc: 'Auto-clicker : +1 clic/s (3 cumulés).' },
+  { id: 'overclock-2', kind: 'autoClick', name: 'Overclock II', icon: '/textures/blaze_powder.png', cost: 1e10, autoClickBonus: 2, desc: 'Auto-clicker : +2 clics/s (5 cumulés).' },
+  { id: 'overclock-3', kind: 'autoClick', name: 'Overclock III', icon: '/textures/beacon.png', cost: 1e11, autoClickBonus: 3, desc: 'Auto-clicker : +3 clics/s. La machine est chaude.' },
 ];
 
 // ---------- Améliorations hors-ligne ----------
 export const OFFLINE_UPGRADES = [
-  { id: 'lanterne', kind: 'offline', name: 'Lanterne de mineur', icon: '/textures/torch.png', cost: 5e8, offlineEffBonus: 0.15, desc: 'Gains hors-ligne : +15 % d’efficacité.' },
-  { id: 'veilleur', kind: 'offline', name: 'Veilleur de nuit', icon: '/textures/soul_torch.png', cost: 5e9, offlineCapBonusMs: 2 * 3600_000, desc: 'Gains hors-ligne : plafond +2 h.' },
-  { id: 'horloge-nether', kind: 'offline', name: 'Horloge du Nether', icon: '/textures/quartz.png', cost: 5e10, offlineEffBonus: 0.15, desc: 'Gains hors-ligne : +15 % d’efficacité supplémentaires.' },
+  { id: 'lanterne', kind: 'offline', name: 'Lanterne de mineur', icon: '/textures/torch.png', cost: 1e9, offlineEffBonus: 0.2, desc: 'Gains hors-ligne : +20 % d’efficacité.' },
+  { id: 'veilleur', kind: 'offline', name: 'Veilleur de nuit', icon: '/textures/soul_torch.png', cost: 1e10, offlineCapBonusMs: 2 * 3600_000, desc: 'Gains hors-ligne : plafond +2 h.' },
+  { id: 'horloge-nether', kind: 'offline', name: 'Horloge du Nether', icon: '/textures/quartz.png', cost: 1e11, offlineEffBonus: 0.2, desc: 'Gains hors-ligne : +20 % d’efficacité supplémentaires.' },
 ];
 
 // ---------- Améliorations de générateurs (auto-générées) ----------
@@ -189,16 +198,16 @@ export const GENERATOR_UPGRADES = GENERATORS.flatMap((gen) =>
   }))
 );
 
-// ---------- Améliorations globales (production totale, très haut de game) ----------
-// Pensées pour être atteintes avec des Renaissances : hors reset, ce serait
-// juste extrêmement long — c'est le but.
+// ---------- Améliorations globales (production totale) ----------
+// Couronne de fin de run : au-delà du 16e générateur, rachetées à
+// chaque Renaissance. Elles ne surviennent PAS au reset — c'est le but.
 export const GLOBAL_UPGRADES = [
   {
     id: 'global-lingot',
     kind: 'global',
     name: 'Lingot de l’au-delà',
     icon: '/textures/netherite_ingot.png',
-    cost: 1e15,
+    cost: 4e17,
     mult: 2,
     desc: 'Production totale ×2. Forgé dans un feu qui n’existe pas.',
   },
@@ -207,7 +216,7 @@ export const GLOBAL_UPGRADES = [
     kind: 'global',
     name: 'Ailes de l’End',
     icon: '/textures/elytra.png',
-    cost: 1.5e16,
+    cost: 6e18,
     mult: 2,
     desc: 'Production totale ×2. Planer au-dessus de la concurrence.',
   },
@@ -216,7 +225,7 @@ export const GLOBAL_UPGRADES = [
     kind: 'global',
     name: 'Socle de bedrock',
     icon: '/textures/bedrock.png',
-    cost: 2e17,
+    cost: 1e20,
     mult: 2,
     desc: 'Production totale ×2. L’économie ne s’effondrera plus jamais.',
   },
@@ -228,65 +237,65 @@ export const STAFF_UPGRADES = [
   {
     id: 'up-goatandcow', kind: 'staff', staffId: 'goatandcow',
     name: 'GoatAndCow — Égo surdimensionné',
-    icon: '/heads/GoatAndCow.png', cost: 2e10,
-    productionMult: 1.15, clickMult: 1.15,
-    desc: 'Production ×1,15 et clics ×1,15. Son ego prend deux postes.',
+    icon: '/heads/GoatAndCow.png', cost: 1e12,
+    productionMult: 1.3, clickMult: 1.3,
+    desc: 'Production ×1,3 et clics ×1,3. Son ego prend deux postes.',
   },
   {
     id: 'up-emmanuel2403', kind: 'staff', staffId: 'emmanuel2403',
     name: 'Emmanuel2403 — Deuxième développeur',
-    icon: '/heads/Emmanuel2403.png', cost: 1e10,
+    icon: '/heads/Emmanuel2403.png', cost: 3e11,
     autoClickPerSec: 2,
     desc: 'Auto-clicker : +2 clics/s. Il a cloné l’auto-clicker.',
   },
   {
     id: 'up-kuani', kind: 'staff', staffId: 'kuani',
     name: 'Kuani — Le bureau doré',
-    icon: '/heads/Kuani.png', cost: 1e8,
-    productionMult: 1.15,
-    desc: 'Production ×1,15. Même le bureau produit de la valeur.',
+    icon: '/heads/Kuani.png', cost: 8e10,
+    productionMult: 1.25,
+    desc: 'Production ×1,25. Même le bureau produit de la valeur.',
   },
   {
     id: 'up-lulu62111', kind: 'staff', staffId: 'lulu62111',
     name: 'Lulu62111 — Salle de clash officielle',
-    icon: '/heads/Lulu62111.png', cost: 1e8,
-    clickMult: 1.5,
-    desc: 'Clics ×1,5. Ses tickets motivent tout le monde.',
+    icon: '/heads/Lulu62111.png', cost: 5e10,
+    clickMult: 1.4,
+    desc: 'Clics ×1,4. Ses tickets motivent tout le monde.',
   },
   {
     id: 'up-mathzmath', kind: 'staff', staffId: 'mathzmath',
     name: 'MathZMath — Câblage refait par un pro',
-    icon: '/heads/MathZMath.png', cost: 1e9,
-    offlineEffBonus: 0.1,
-    desc: 'Gains hors-ligne : +10 % d’efficacité. Zéro euro de réseau cette fois.',
+    icon: '/heads/MathZMath.png', cost: 1e11,
+    offlineEffBonus: 0.15,
+    desc: 'Gains hors-ligne : +15 % d’efficacité. Zéro euro de réseau cette fois.',
   },
   {
     id: 'up-zoxxio', kind: 'staff', staffId: 'zoxxio',
     name: 'ZoxXio — Container de tours Eiffel',
-    icon: '/heads/ZoxXio.png', cost: 1e9,
-    genCostMult: 0.97,
-    desc: 'Générateurs −3 %. En gros au kilomètre.',
+    icon: '/heads/ZoxXio.png', cost: 1e11,
+    genCostMult: 0.96,
+    desc: 'Générateurs −4 %. En gros au kilomètre.',
   },
   {
     id: 'up-letsgo2myhome', kind: 'staff', staffId: 'letsgo2myhome',
     name: 'LetsGo2Myhome — Veilleuse anti-sommeil',
-    icon: '/heads/LetsGo2Myhome.png', cost: 1e9,
-    appleFreqMult: 1.25,
-    desc: 'Pommes dorées ×1,25 plus fréquentes. Il les voit arriver de loin.',
+    icon: '/heads/LetsGo2Myhome.png', cost: 1e11,
+    appleFreqMult: 1.15,
+    desc: 'Pommes dorées ×1,15 plus fréquentes. Il les voit arriver de loin.',
   },
   {
     id: 'up-fl0ryoz', kind: 'staff', staffId: 'fl0ryoz',
     name: 'Fl0ryoz — Nuit blanche éternelle',
-    icon: '/heads/Fl0ryoz.png', cost: 1e9,
+    icon: '/heads/Fl0ryoz.png', cost: 1e11,
     offlineCapBonusMs: 2 * 3600_000,
     desc: 'Gains hors-ligne : plafond +2 h. Il ne dort plus depuis 2019.',
   },
   {
     id: 'up-azale_e', kind: 'staff', staffId: 'azale_e',
     name: 'Azale_e — Ménage de printemps',
-    icon: '/heads/Azale_e.png', cost: 1e9,
-    appleFreqMult: 1.2,
-    desc: 'Pommes ×1,20 plus fréquentes. Elle balaie le verger, elles tombent toutes seules.',
+    icon: '/heads/Azale_e.png', cost: 1e11,
+    appleFreqMult: 1.1,
+    desc: 'Pommes ×1,10 plus fréquentes. Elle balaie le verger, elles tombent toutes seules.',
   },
   {
     id: 'up-kendiix', kind: 'staff', staffId: 'kendiix',
@@ -301,14 +310,14 @@ export const CASE_UPGRADES = [
   {
     id: 'case-pioche-destin', kind: 'case', rarity: 'epique',
     name: 'Pioche du Destin', icon: '/textures/netherite_pickaxe.png',
-    clickMult: 10,
-    desc: 'Clics ×10. EXCLUSIVE — uniquement dans les cases.',
+    clickMult: 4,
+    desc: 'Clics ×4. EXCLUSIVE — uniquement dans les caisses.',
   },
   {
     id: 'case-coeur-serveur', kind: 'case', rarity: 'epique',
     name: 'Cœur du Serveur', icon: '/textures/heart_of_the_sea.png',
     productionMult: 2,
-    desc: 'Production ×2. EXCLUSIVE — uniquement dans les cases.',
+    desc: 'Production ×2. EXCLUSIVE — uniquement dans les caisses.',
   },
   {
     id: 'case-oeil-kendiix', kind: 'case', rarity: 'rare',
@@ -331,8 +340,8 @@ export const CASE_UPGRADES = [
   {
     id: 'case-mains-dorees', kind: 'case', rarity: 'rare',
     name: 'Mains dorées', icon: '/textures/golden_apple.png',
-    clickMult: 3,
-    desc: 'Clics ×3. EXCLUSIVE — uniquement dans les cases.',
+    clickMult: 2,
+    desc: 'Clics ×2. EXCLUSIVE — uniquement dans les caisses.',
   },
 ];
 
@@ -363,20 +372,20 @@ export const STAFF = [
     id: 'goatandcow',
     pseudo: 'GoatAndCow',
     role: 'Créateur',
-    roleClass: 'border-amber-400/50 bg-amber-500/15 text-amber-300',
+    roleClass: 'chip chip-warning',
     icon: '/heads/GoatAndCow.png',
-    cost: 1e8,
-    effects: { productionMult: 1.25, clickMult: 1.25 },
+    cost: 1e9,
+    effects: { productionMult: 1.3, clickMult: 1.3 },
     desc: 'Moi. Le créateur. Le meilleur, tout simplement. Ce jeu est mon génie — applaudissez, c’est gratuit.',
-    effectLabel: 'Production ×1,25 et clics ×1,25',
+    effectLabel: 'Production ×1,30 et clics ×1,30',
   },
   {
     id: 'emmanuel2403',
     pseudo: 'Emmanuel2403',
     role: 'Développeur',
-    roleClass: 'border-cyan-400/50 bg-cyan-500/15 text-cyan-300',
+    roleClass: 'chip chip-info',
     icon: '/heads/Emmanuel2403.png',
-    cost: 8e6,
+    cost: 5e7,
     effects: { autoClickPerSec: 2 },
     desc: 'Il reprend le serveur en main. Première mise à jour : un auto-clicker.',
     effectLabel: '2 clics automatiques par seconde',
@@ -385,20 +394,20 @@ export const STAFF = [
     id: 'kuani',
     pseudo: 'Kuani',
     role: 'Gérant',
-    roleClass: 'border-ember-400/50 bg-ember-500/15 text-ember-300',
+    roleClass: 'chip chip-accent',
     icon: '/heads/Kuani.png',
-    cost: 5e6,
-    effects: { productionMult: 1.2 },
+    cost: 2.5e7,
+    effects: { productionMult: 1.25 },
     desc: 'Le meilleur, mais il a peur du changement… faut bien lui trouver un défaut.',
-    effectLabel: 'Production ×1,20',
+    effectLabel: 'Production ×1,25',
   },
   {
     id: 'lulu62111',
     pseudo: 'Lulu62111',
     role: 'Admin',
-    roleClass: 'border-red-400/50 bg-red-500/15 text-red-300',
+    roleClass: 'chip chip-danger',
     icon: '/heads/Lulu62111.png',
-    cost: 2e6,
+    cost: 8e6,
     effects: { clickMult: 2 },
     desc: 'Encore un bébé, mais il clash dans les tickets — ça fait son charme.',
     effectLabel: 'Clics ×2',
@@ -407,62 +416,62 @@ export const STAFF = [
     id: 'mathzmath',
     pseudo: 'MathZMath',
     role: 'Gérant',
-    roleClass: 'border-ember-400/50 bg-ember-500/15 text-ember-300',
+    roleClass: 'chip chip-accent',
     icon: '/heads/MathZMath.png',
-    cost: 1.8e6,
+    cost: 5e6,
     effects: { offlineEffBonus: 0.15 },
     desc: 'Chacun son taff, on ne touche pas à ce qu’on ne sait pas faire. Il a essayé : 200 € de réseau.',
-    effectLabel: 'Gains hors-ligne : 50 % → 65 %',
+    effectLabel: 'Gains hors-ligne : 60 % → 75 %',
   },
   {
     id: 'zoxxio',
     pseudo: 'ZoxXio',
     role: 'Modo',
-    roleClass: 'border-sky-400/50 bg-sky-500/15 text-sky-300',
+    roleClass: 'chip chip-info',
     icon: '/heads/ZoxXio.png',
-    cost: 1.5e6,
-    effects: { genCostMult: 0.95 },
+    cost: 4e6,
+    effects: { genCostMult: 0.94 },
     desc: 'Le pak-pak des tours Eiffel. Il négocie même vos générateurs.',
-    effectLabel: 'Générateurs −5 %',
+    effectLabel: 'Générateurs −6 %',
   },
   {
     id: 'letsgo2myhome',
     pseudo: 'LetsGo2Myhome',
     role: 'Modo',
-    roleClass: 'border-sky-400/50 bg-sky-500/15 text-sky-300',
+    roleClass: 'chip chip-info',
     icon: '/heads/LetsGo2Myhome.png',
-    cost: 1e6,
-    effects: { appleFreqMult: 1.5 },
+    cost: 3e6,
+    effects: { appleFreqMult: 1.3 },
     desc: 'Il veille surtout la nuit — rien ne lui échappe, surtout pas les pommes dorées.',
-    effectLabel: 'Pommes dorées ×1,5 plus fréquentes',
+    effectLabel: 'Pommes dorées ×1,3 plus fréquentes',
   },
   {
     id: 'fl0ryoz',
     pseudo: 'Fl0ryoz',
     role: 'Modo',
-    roleClass: 'border-sky-400/50 bg-sky-500/15 text-sky-300',
+    roleClass: 'chip chip-info',
     icon: '/heads/Fl0ryoz.png',
-    cost: 8e5,
+    cost: 2e6,
     effects: { offlineCapBonusMs: 4 * 3600_000 },
     desc: 'Là depuis la nuit des temps. Il modérait déjà avant la première pierre posée.',
-    effectLabel: '+4 h de gains hors-ligne (12 h max)',
+    effectLabel: '+4 h de gains hors-ligne (18 h max)',
   },
   {
     id: 'azale_e',
     pseudo: 'Azale_e',
     role: 'Modo',
-    roleClass: 'border-sky-400/50 bg-sky-500/15 text-sky-300',
+    roleClass: 'chip chip-info',
     icon: '/heads/Azale_e.png',
-    cost: 8e5,
-    effects: { productionMult: 1.1 },
+    cost: 2e6,
+    effects: { productionMult: 1.15 },
     desc: 'Elle devrait être à la cuisine, mais finalement, elle est là.',
-    effectLabel: 'Production ×1,10',
+    effectLabel: 'Production ×1,15',
   },
   {
     id: 'kendiix',
     pseudo: 'KendiiX',
     role: 'Modélisateur',
-    roleClass: 'border-violet-400/50 bg-violet-500/15 text-violet-300',
+    roleClass: 'chip chip-storm',
     icon: '/heads/KendiiX.png',
     cost: 1,
     effects: { productionMult: 0.9 },
@@ -482,8 +491,8 @@ export const ACHIEVEMENTS = [
   { id: 'click-1000', name: 'Machine à cliquer', icon: '🖱️', desc: 'Atteindre 1 000 clics.', check: (s) => s.clicks >= 1000 },
   { id: 'click-10000', name: 'Légende du clic', icon: '🏆', desc: 'Atteindre 10 000 clics.', check: (s) => s.clicks >= 10000 },
   { id: 'click-atomique', name: 'Clic atomique', icon: '💪', desc: 'Atteindre 1 million d’EndoCraft par clic.', check: (s) => s.clickPower >= 1e6 },
-  { id: 'speed-1m', name: 'Éclair', icon: '⚡', desc: 'Récolter 1 million d’EndoCraft en moins d’une heure de jeu.', check: (s) => s.totalEndocraft >= 1e6 && s.playMs <= 3_600_000 },
-  { id: 'speed-1b', name: 'Supersonique', icon: '🚀', desc: 'Récolter 1 milliard d’EndoCraft en moins de 2 heures de jeu.', check: (s) => s.totalEndocraft >= 1e9 && s.playMs <= 7_200_000 },
+  { id: 'speed-1m', name: 'Éclair', icon: '⚡', desc: 'Récolter 1 milliard d’EndoCraft en moins de 4 heures de jeu.', check: (s) => s.totalEndocraft >= 1e9 && s.playMs <= 14_400_000 },
+  { id: 'speed-1b', name: 'Supersonique', icon: '🚀', desc: 'Récolter 1 000 milliards d’EndoCraft en moins de 8 heures de jeu.', check: (s) => s.totalEndocraft >= 1e12 && s.playMs <= 28_800_000 },
   { id: 'total-100', name: 'Premières pépites', icon: '🪙', desc: 'Récolter 100 EndoCraft au total.', check: (s) => s.totalEndocraft >= 100 },
   { id: 'total-10k', name: 'Petite fortune', icon: '💰', desc: 'Récolter 10 000 EndoCraft au total.', check: (s) => s.totalEndocraft >= 1e4 },
   { id: 'total-1m', name: 'Millionnaire', icon: '🤑', desc: 'Récolter 1 million d’EndoCraft au total.', check: (s) => s.totalEndocraft >= 1e6 },
@@ -491,7 +500,7 @@ export const ACHIEVEMENTS = [
   { id: 'total-10b', name: 'Économie de l’End', icon: '🌌', desc: 'Récolter 10 milliards d’EndoCraft au total.', check: (s) => s.totalEndocraft >= 1e10 },
   { id: 'total-1t', name: 'Endo-Trillionnaire', icon: '🌠', desc: 'Récolter 1 000 milliards d’EndoCraft au total.', check: (s) => s.totalEndocraft >= 1e12 },
   { id: 'total-1qa', name: 'Économie galactique', icon: '🌌', desc: 'Récolter 1 quadrillion d’EndoCraft au total.', check: (s) => s.totalEndocraft >= 1e15 },
-  { id: 'bank-1t', name: 'Grosses poches', icon: '👖', desc: 'Avoir 1 000 milliards d’EndoCraft en banque d’un coup.', check: (s) => s.bank >= 1e12 },
+  { id: 'bank-1t', name: 'Grosses poches', icon: '👖', desc: 'Avoir 100 000 milliards d’EndoCraft en banque d’un coup.', check: (s) => s.bank >= 1e14 },
   { id: 'gen-1', name: 'Premier employé', icon: '🪓', desc: 'Acheter un premier générateur.', check: (s) => s.totalGenerators >= 1 },
   { id: 'gen-10', name: 'Petite équipe', icon: '👥', desc: 'Posséder 10 générateurs.', check: (s) => s.totalGenerators >= 10 },
   { id: 'gen-50', name: 'Entreprise prospère', icon: '🏢', desc: 'Posséder 50 générateurs.', check: (s) => s.totalGenerators >= 50 },
@@ -517,10 +526,10 @@ export const ACHIEVEMENTS = [
   { id: 'renaissance-10', name: 'Bouddha du clic', icon: '🧘', desc: 'Renaître 10 fois. Le cycle n’a plus d’emprise sur vous.', check: (s) => s.renaissances >= 10 },
   { id: 'cosmetic-all', name: 'Garde-robe complète', icon: '👛', desc: 'Posséder tous les skins de pièce payants.', check: (s) => s.cosmeticsCount >= 3 },
   { id: 'masochiste', name: 'Masochiste', icon: '😈', desc: 'Améliorer KendiiX. Volontairement. Avec vos EndoCraft.', check: (s) => s.upgradeIds.includes('up-kendiix') },
-  { id: 'direction', name: 'Direction générale', icon: '🏛️', desc: 'Recruter toute l’équipe ET acheter toutes ses améliorations (18 objets).', check: (s) => s.staffIds.length >= STAFF.length && STAFF_UPGRADES.every((u) => s.upgradeIds.includes(u.id)) },
+  { id: 'direction', name: 'Direction générale', icon: '🏛️', desc: 'Recruter toute l’équipe ET acheter toutes ses améliorations (20 objets).', check: (s) => s.staffIds.length >= STAFF.length && STAFF_UPGRADES.every((u) => s.upgradeIds.includes(u.id)) },
   { id: 'centurion', name: 'Centurion', icon: '💯', desc: 'Posséder 100 exemplaires d’un même générateur.', check: (s) => s.maxGenCount >= 100 },
   { id: 'tempete', name: 'Tempête parfaite', icon: '🌪️', desc: 'Attraper une pomme de pluie pendant une frénésie.', check: (s) => s.rainFrenzyCatches >= 1 },
-  { id: 'dormir-riche', name: 'Dormir riche', icon: '😴', desc: 'Encaisser 1 milliard d’EndoCraft de gains hors-ligne d’un coup.', check: (s) => s.maxOfflineGain >= 1e9 },
+  { id: 'dormir-riche', name: 'Dormir riche', icon: '😴', desc: 'Encaisser 1 000 milliards d’EndoCraft de gains hors-ligne d’un coup.', check: (s) => s.maxOfflineGain >= 1e12 },
   { id: 'curieux', name: 'Le curieux', icon: '🧐', desc: 'Un secret bien caché quelque part sur cette page…', check: (s) => s.titleClicks >= 25 },
   { id: 'quest-1', name: 'Premier jour au travail', icon: '📋', desc: 'Réclamer une quête quotidienne.', check: (s) => s.questsClaimed >= 1 },
   { id: 'quest-50', name: 'Employé du mois', icon: '💼', desc: 'Réclamer 50 quêtes quotidiennes. Le CDI est signé.', check: (s) => s.questsClaimed >= 50 },
@@ -551,7 +560,7 @@ export const COIN_SKINS = [
     id: 'endosage',
     name: 'EndoSage',
     icon: '/cosmetics/endosage.png',
-    cost: 2e8,
+    cost: 5e9,
     desc: 'La version sage de la pièce. Verte, apaisante, redoutable.',
     perk: {
       id: 'appleDuration',
@@ -569,7 +578,7 @@ export const COIN_SKINS = [
     id: 'endoblaze',
     name: 'EndoBlaze',
     icon: '/cosmetics/endoblaze.png',
-    cost: 3.5e8,
+    cost: 1e10,
     desc: 'La pièce du Nexus de feu. Sa gemme brûle d’un millénaire de clics.',
     perk: {
       id: 'frenzyDuration',
@@ -587,11 +596,11 @@ export const COIN_SKINS = [
     id: 'endoroi',
     name: 'EndoRoi',
     icon: '/cosmetics/endoroi.png',
-    cost: 5e8,
+    cost: 2e10,
     desc: 'La pièce de ceux qui cliquent sur un trône. Couronne incluse.',
     perk: {
       id: 'luckyBonus',
-      label: 'Dîme royale : les pommes chanceuses rapportent 15 % de la banque (au lieu de 10 %).',
+      label: 'Dîme royale : les pommes chanceuses rapportent 12 % de la banque (au lieu de 10 %).',
     },
     fx: {
       colors: ['#ffd700', '#ffeb9e', '#d4a843', '#fb8113', '#fff3c4'],
@@ -641,8 +650,8 @@ export const COIN_SKIN_BY_ID = Object.fromEntries(
 // La progression se mesure en delta de compteurs à vie sur la journée.
 export const DAILY_QUESTS = {
   perDay: 3,
-  rewardSeconds: 60, // récompense ≈ 1 min de production par quête
-  bonusMult: 3, // bonus toutes-quêtes : 3× la récompense d'une quête
+  rewardSeconds: 90, // récompense ≈ 1,5 min de production par quête (figée au spawn)
+  bonusMult: 4, // bonus toutes-quêtes : journée parfaite = 6 min de production
   pool: [
     { type: 'clicks', label: 'Clicateur', icon: '👆', min: 200, max: 600, fmt: (n) => `Cliquez ${n} fois sur la pièce` },
     { type: 'earn', label: 'Paye du jour', icon: '💰', dynamic: true, fmt: (n) => `Récoltez ${fmt(n)} EndoCraft` },
@@ -664,24 +673,38 @@ export const RARITIES = {
   legendaire: { label: 'Légendaire', color: '#f59e0b', glow: 'rgba(245, 158, 11, 0.75)' },
 };
 
+// Remboursement d'un doublon (upgrade/skin/tag déjà possédé),
+// en % du prix de la caisse — la chance ne rend pas fou, mais
+// elle ne punit plus non plus d'être déjà riche.
+export const CASE_DUPLICATE_REFUND = {
+  commun: 0.15,
+  rare: 0.2,
+  epique: 0.2,
+  legendaire: 0.25,
+};
 
 // Une caisse = un coût + une table de drops pondérée.
 // Drop : soit une upgrade exclusive, soit un prix immédiat.
+// Équilibrage V2 : EV cash ~63-67 % du prix, EV globale ~91-94 %
+// pour un joueur qui ne possède pas encore les exclusives.
 export const CASES = [
   {
     id: 'bois', name: 'Caisse en bois', icon: '/cases/bois.png',
     cost: 1e6,
     desc: 'Pour commencer. Surtout du rembobinage, rarement mieux.',
     drops: [
-      { weight: 25, rarity: 'commun', type: 'cash', percent: 0.5, label: 'Cash ×0,5 (grosse perte)' },
-      { weight: 18, rarity: 'commun', type: 'cash', percent: 0.75, label: 'Cash ×0,75 (perte sèche)' },
-      { weight: 10, rarity: 'commun', type: 'cash', percent: 1, label: 'Cash ×1 (remboursé)' },
-      { weight: 10, rarity: 'commun', type: 'nothing', label: 'Rien. Vide. Nada.' },
+      { weight: 14, rarity: 'commun', type: 'cash', percent: 0.5, label: 'Cash ×0,5 (grosse perte)' },
+      { weight: 12, rarity: 'commun', type: 'cash', percent: 0.75, label: 'Cash ×0,75 (perte sèche)' },
+      { weight: 11, rarity: 'commun', type: 'cash', percent: 1, label: 'Cash ×1 (remboursé)' },
+      { weight: 2, rarity: 'commun', type: 'nothing', label: 'Rien. Vide. Nada.' },
       { weight: 10, rarity: 'commun', type: 'frenzy', durationMs: 15_000, label: 'Frénésie 15 s' },
-      { weight: 10, rarity: 'rare', type: 'cash', percent: 1.5, label: 'Cash ×1,5' },
-      { weight: 8, rarity: 'rare', type: 'rain', label: 'Pluie de pommes' },
       { weight: 4, rarity: 'commun', type: 'tag', tagId: 'tag-parieur', label: 'Tag « le Parieur »' },
-      { weight: 5, rarity: 'epique', type: 'upgrade', upgradeId: 'case-mains-dorees' },
+      { weight: 11, rarity: 'rare', type: 'cash', percent: 1.5, label: 'Cash ×1,5' },
+      { weight: 7, rarity: 'rare', type: 'bank', bankPercent: 0.05, label: '+5 % de votre banque' },
+      { weight: 8, rarity: 'rare', type: 'rain', label: 'Pluie de pommes' },
+      { weight: 7, rarity: 'rare', type: 'cash', percent: 2.5, label: 'Cash ×2,5' },
+      { weight: 8, rarity: 'epique', type: 'upgrade', upgradeId: 'case-mains-dorees' },
+      { weight: 6, rarity: 'epique', type: 'bank', bankPercent: 0.08, label: '+8 % de votre banque' },
     ],
   },
   {
@@ -689,17 +712,19 @@ export const CASES = [
     cost: 5e7,
     desc: 'Le feu aux fesses — quand ça veut bien tomber.',
     drops: [
-      { weight: 20, rarity: 'commun', type: 'cash', percent: 0.5, label: 'Cash ×0,5 (grosse perte)' },
-      { weight: 15, rarity: 'commun', type: 'cash', percent: 0.75, label: 'Cash ×0,75 (perte sèche)' },
-      { weight: 12, rarity: 'commun', type: 'cash', percent: 1, label: 'Cash ×1 (remboursé)' },
-      { weight: 10, rarity: 'commun', type: 'nothing', label: 'Rien. Vide. Nada.' },
-      { weight: 8, rarity: 'commun', type: 'frenzy', durationMs: 20_000, label: 'Frénésie 20 s' },
-      { weight: 10, rarity: 'rare', type: 'cash', percent: 2, label: 'Cash ×2' },
-      { weight: 8, rarity: 'rare', type: 'frenzy', durationMs: 90_000, label: 'Frénésie 90 s' },
-      { weight: 5, rarity: 'rare', type: 'upgrade', upgradeId: 'case-verger-infini' },
-      { weight: 5, rarity: 'rare', type: 'upgrade', upgradeId: 'case-oeil-kendiix' },
+      { weight: 15, rarity: 'commun', type: 'cash', percent: 0.5, label: 'Cash ×0,5 (grosse perte)' },
+      { weight: 14, rarity: 'commun', type: 'cash', percent: 0.75, label: 'Cash ×0,75 (perte sèche)' },
+      { weight: 13, rarity: 'commun', type: 'cash', percent: 1, label: 'Cash ×1 (remboursé)' },
+      { weight: 9.5, rarity: 'commun', type: 'nothing', label: 'Rien. Vide. Nada.' },
+      { weight: 11, rarity: 'rare', type: 'cash', percent: 1.5, label: 'Cash ×1,5' },
+      { weight: 7, rarity: 'rare', type: 'bank', bankPercent: 0.05, label: '+5 % de votre banque' },
+      { weight: 7, rarity: 'rare', type: 'frenzy', durationMs: 90_000, label: 'Frénésie 90 s' },
+      { weight: 4, rarity: 'rare', type: 'upgrade', upgradeId: 'case-verger-infini' },
+      { weight: 4, rarity: 'rare', type: 'upgrade', upgradeId: 'case-oeil-kendiix' },
       { weight: 3, rarity: 'rare', type: 'tag', tagId: 'tag-chanceux', label: 'Tag « le Chanceux »' },
-      { weight: 4, rarity: 'epique', type: 'upgrade', upgradeId: 'case-pioche-destin' },
+      { weight: 5, rarity: 'epique', type: 'cash', percent: 3, label: 'Cash ×3' },
+      { weight: 5, rarity: 'epique', type: 'bank', bankPercent: 0.08, label: '+8 % de votre banque' },
+      { weight: 2.5, rarity: 'epique', type: 'upgrade', upgradeId: 'case-pioche-destin' },
     ],
   },
   {
@@ -707,33 +732,44 @@ export const CASES = [
     cost: 1e9,
     desc: 'Là où vivent les légendes. Et beaucoup de rembobinage.',
     drops: [
-      { weight: 15, rarity: 'commun', type: 'cash', percent: 0.5, label: 'Cash ×0,5 (grosse perte)' },
-      { weight: 15, rarity: 'commun', type: 'cash', percent: 0.75, label: 'Cash ×0,75 (perte sèche)' },
-      { weight: 12, rarity: 'commun', type: 'cash', percent: 1, label: 'Cash ×1 (remboursé)' },
-      { weight: 10, rarity: 'commun', type: 'nothing', label: 'Rien. Vide. Nada.' },
-      { weight: 8, rarity: 'commun', type: 'frenzy', durationMs: 25_000, label: 'Frénésie 25 s' },
+      { weight: 17, rarity: 'commun', type: 'cash', percent: 0.5, label: 'Cash ×0,5 (grosse perte)' },
+      { weight: 38.5, rarity: 'commun', type: 'cash', percent: 0.75, label: 'Cash ×0,75 (perte sèche)' },
       { weight: 8, rarity: 'rare', type: 'cash', percent: 2, label: 'Cash ×2' },
-      { weight: 10, rarity: 'rare', type: 'upgrade', upgradeId: 'case-oeil-kendiix' },
-      { weight: 6, rarity: 'epique', type: 'upgrade', upgradeId: 'case-coeur-serveur' },
-      { weight: 5, rarity: 'epique', type: 'upgrade', upgradeId: 'case-pioche-destin' },
-      { weight: 3, rarity: 'epique', type: 'tag', tagId: 'tag-main-benie', label: 'Tag « la Main bénie »' },
-      { weight: 3, rarity: 'legendaire', type: 'upgrade', upgradeId: 'case-benediction' },
-      { weight: 3, rarity: 'legendaire', type: 'skin', skinId: 'endocrystal', label: 'Skin ENDOCRYSTAL 💗 (production ×1,5 !)' },
+      { weight: 7, rarity: 'rare', type: 'bank', bankPercent: 0.05, label: '+5 % de votre banque' },
+      { weight: 6, rarity: 'rare', type: 'upgrade', upgradeId: 'case-oeil-kendiix' },
+      { weight: 3, rarity: 'epique', type: 'cash', percent: 4, label: 'Cash ×4' },
+      { weight: 5, rarity: 'epique', type: 'bank', bankPercent: 0.08, label: '+8 % de votre banque' },
+      { weight: 4, rarity: 'epique', type: 'upgrade', upgradeId: 'case-coeur-serveur' },
+      { weight: 2.5, rarity: 'epique', type: 'upgrade', upgradeId: 'case-pioche-destin' },
+      { weight: 2, rarity: 'epique', type: 'tag', tagId: 'tag-main-benie', label: 'Tag « la Main bénie »' },
+      { weight: 2.5, rarity: 'legendaire', type: 'upgrade', upgradeId: 'case-benediction' },
+      { weight: 2.5, rarity: 'legendaire', type: 'skin', skinId: 'endocrystal', label: 'Skin ENDOCRYSTAL 💗 (production ×1,5 !)' },
       { weight: 2, rarity: 'legendaire', type: 'tag', tagId: 'tag-empereur', label: 'Tag « Empereur du Hasard »' },
     ],
   },
 ];
+
 // ---------- Renaissance (prestige) ----------
-// À partir du seuil farmé À VIE, on peut tout recommencer à zéro contre
-// +15 % de production permanente par renaissance. Le seuil monte à chaque
-// renaissance (500 B → 2 T → 8 T → 32 T…).
-// On garde : succès, cosmétiques, stats de clics et de pommes.
-// On perd : solde, générateurs, améliorations, équipe.
+// À partir du seuil farmé DEPUIS LA DERNIERE RENAISSANCE (le total à vie
+// ne suffit plus : impossible d'enchaîner les renaissances sur un gros
+// total historique), on peut tout recommencer à zéro contre :
+// - un bonus de production permanent B(n) = (1 + 0,25n) × 1,15^n
+// - les « Braises du Phénix » : n × 2,5 Md d'EndoCraft de départ
+// On garde : succès, cosmétiques, tags, exclusives de caisses, stats.
+// On perd : solde (remplacé par les braises), générateurs, améliorations,
+// équipe.
 export const RENAISSANCE = {
   baseThreshold: 5e11, // 500 B pour la 1ère renaissance
-  thresholdGrowth: 4, // ×4 par renaissance suivante (2 T, 8 T, 32 T…)
-  multPerRenaissance: 0.15, // +15 % de production par renaissance (additif)
+  thresholdGrowth: 3, // ×3 par renaissance suivante (1,5 T, 4,5 T, 13,5 T…)
+  multPerRenaissance: 0.25, // part additive du bonus : +25 % par renaissance
+  multGrowth: 1.15, // part multiplicative : ×1,15 par renaissance
+  emberBankPerRenaissance: 2.5e9, // Braises du Phénix : 2,5 Md par renaissance
 };
+
+// Bonus de production permanent pour n renaissances
+export function getRenaissanceMult(n) {
+  return (1 + RENAISSANCE.multPerRenaissance * n) * Math.pow(RENAISSANCE.multGrowth, n || 0);
+}
 
 // Seuil de la PROCHAINE renaissance (count = renaissances déjà faites)
 export function getRenaissanceThreshold(count) {
@@ -742,13 +778,11 @@ export function getRenaissanceThreshold(count) {
   );
 }
 
-import { fmt } from './format.js';
-
 // ---------- Pomme dorée ----------
 export const APPLE = {
   minDelayMs: 60_000, // délai minimal avant la 1ère apparition
-  intervalMinMs: 75_000,
-  intervalMaxMs: 180_000,
+  intervalMinMs: 90_000,
+  intervalMaxMs: 200_000,
   visibleMs: 12_000,
 };
 
@@ -757,7 +791,7 @@ export const APPLE = {
 // via filtre CSS sur la texture dorée.
 export const APPLE_TYPES = {
   doree: {
-    id: 'doree', name: 'Pomme dorée', weight: 0.6, icon: '🍎',
+    id: 'doree', name: 'Pomme dorée', weight: 0.55, icon: '🍎',
     filter: 'none',
     title: 'Pomme dorée ! Attrapez-la vite !',
   },
@@ -767,53 +801,60 @@ export const APPLE_TYPES = {
     title: "Pomme d'orage ! Pluie garantie !",
   },
   ombre: {
-    id: 'ombre', name: "Pomme d'ombre", weight: 0.12, icon: '🌑',
+    id: 'ombre', name: "Pomme d'ombre", weight: 0.13, icon: '🌑',
     filter: 'hue-rotate(270deg) brightness(0.55) saturate(1.4)',
     title: "Pomme d'ombre ! La tempête de clics approche…",
   },
   cristal: {
-    id: 'cristal', name: 'Pomme de cristal', weight: 0.08, icon: '💎',
+    id: 'cristal', name: 'Pomme de cristal', weight: 0.1, icon: '💎',
     filter: 'hue-rotate(195deg) brightness(1.35) saturate(0.55)',
     title: 'Pomme de cristal ! Le temps vous paie cash.',
   },
   maudite: {
-    id: 'maudite', name: 'Pomme maudite', weight: 0.05, icon: '💀',
+    id: 'maudite', name: 'Pomme maudite', weight: 0.07, icon: '💀',
     filter: 'hue-rotate(85deg) brightness(0.7) saturate(1.3)',
     title: 'Pomme maudite… KendiiX l’a touchée.',
   },
 };
 
 export const APPLE_REWARDS = {
-  frenzy: { weight: 0.7, mult: 7, durationMs: 30_000 },
-  lucky: { weight: 0.3 }, // +10 % de la banque actuelle (15 % avec EndoRoi)
+  // Si une frénésie est déjà active, la pomme dorée bascule sur
+  // la récompense « chanceuse » : jamais de frénésie gaspillée.
+  frenzy: { weight: 0.65, mult: 7, durationMs: 30_000 },
+  lucky: { weight: 0.35, bankPercent: 0.1, capSeconds: 300 }, // 12 % avec EndoRoi
 };
 
-// Tempête de clics (pomme d'ombre)
+// Tempête de clics (pomme d'ombre) — bornée : les mini-pommes sont
+// plafonnées en nombre et en gain, sur une banque figée au déclenchement.
 export const SHADOW_STORM = {
   durationMs: 10_000,
-  minisPerClick: [2, 3], // mini-pommes lâchées par clic
-  miniBankPercent: 0.005, // +0,5 % de banque par mini-pommes attrapée
+  minisPerClick: [1, 2], // mini-pommes lâchées par clic
+  maxMinisPerStorm: 60, // plafond : pas de tempête infinie
+  miniBankPercent: 0.002, // +0,2 % de la banque de départ par mini
+  miniCapSeconds: 5, // …plafonné à 5 s de production par mini
 };
 
 // Pomme de cristal : minutes de production versées immédiatement
-export const CRYSTAL_PRODUCTION_SECONDS = 120;
+export const CRYSTAL_PRODUCTION_SECONDS = 180;
 
 // Pomme maudite : délai de doute avant le jackpot
 export const CURSED_DELAY_MS = 5_000;
-export const CURSED_BANK_PERCENT = 0.2; // +20 % de la banque
+export const CURSED_BANK_PERCENT = 0.12; // +12 % de la banque
+export const CURSED_CAP_SECONDS = 900; // plafonné à 15 min de production
 
 // ---------- Pluie de pommes (événement rare) ----------
 // Déclenchée avec de faibles chances en attrapant une pomme dorée :
 // des pommes tombent du haut de l'écran, chacune attrapée rapporte
 // un petit % de la banque. Se cumule avec la récompense normale.
 export const APPLE_RAIN = {
-  triggerChance: 0.1, // 10 % de chance par pomme dorée attrapée (l'orage la provoque aussi)
+  triggerChance: 0.08, // 8 % de chance par pomme dorée attrapée (l'orage la provoque aussi)
   durationMs: 10_000, // durée de l'événement
   spawnMinMs: 450, // intervalle entre les pommes
   spawnMaxMs: 700,
   fallMinMs: 2_800, // durée de chute d'une pomme
   fallMaxMs: 4_200,
-  maxApples: 15, // plafond sur l'événement complet
-  bankPercent: 0.02, // 2 % de la banque par pomme attrapée
+  maxApples: 10, // plafond sur l'événement complet
+  bankPercent: 0.01, // 1 % de la banque par pomme attrapée
+  capSeconds: 30, // …plafonné à 30 s de production par pomme
   minGain: 25, // plancher pour les débutants
 };

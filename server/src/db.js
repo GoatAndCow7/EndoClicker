@@ -64,6 +64,26 @@ db.exec(`
   }
 }
 
+// --- Reset mondial ---
+// Incrémentée à chaque grande refonte d'équilibrage. Au démarrage, si la
+// base est plus ancienne, toute la progression est effacée (les comptes
+// sont conservés) : tout le monde repart sur une base propre et équitable.
+const WORLD_VERSION = 2;
+db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL)');
+{
+  const row = db.prepare("SELECT value FROM meta WHERE key = 'world_version'").get();
+  if (!row || row.value < WORLD_VERSION) {
+    db.prepare('DELETE FROM states').run();
+    db.prepare(
+      "INSERT OR REPLACE INTO meta (key, value) VALUES ('world_version', ?)"
+    ).run(WORLD_VERSION);
+    console.log(
+      `♻️ V2 : reset mondial appliqué (version du monde ${WORLD_VERSION}).` +
+        ` Progression de tous les joueurs remise à zéro, comptes conservés.`
+    );
+  }
+}
+
 export function now() {
   return Date.now();
 }

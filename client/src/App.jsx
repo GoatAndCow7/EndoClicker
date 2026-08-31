@@ -11,6 +11,7 @@ import Toasts from './components/Toasts.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import OfflineModal from './components/OfflineModal.jsx';
 import GoldenApple from './components/GoldenApple.jsx';
+import ChangelogModal from './components/ChangelogModal.jsx';
 
 // Auto : nuit entre 20h et 7h (heure locale du joueur). La préférence
 // ('auto' | 'day' | 'night') prime — ?forceNight reste prioritaire pour
@@ -32,6 +33,7 @@ export default function App() {
   const floatLayerRef = useRef(null);
   const initialized = useRef(false);
   const dayNightPref = useGame((s) => s.dayNightPref);
+  const shadowStorm = useGame((s) => s.shadowStorm); // change rarement : ok ici
   const [night, setNight] = useState(() => isNight(dayNightPref));
 
   // Bascule auto au passage des heures + réaction à la préférence
@@ -40,6 +42,12 @@ export default function App() {
     const t = setInterval(() => setNight(isNight(dayNightPref)), 60_000);
     return () => clearInterval(t);
   }, [dayNightPref]);
+
+  // Le thème est aussi posé sur <html> : les variables du body, de la
+  // scrollbar et de ::selection basculent avec les panneaux.
+  useEffect(() => {
+    document.documentElement.classList.toggle('night', night);
+  }, [night]);
 
   useEffect(() => {
     if (initialized.current) return; // StrictMode double-mount
@@ -56,17 +64,24 @@ export default function App() {
     <div
       className={`app-bg relative flex h-full flex-col overflow-hidden ${night ? 'night' : ''}`}
     >
+      {/* Couches nuit : crossfade en opacité pure (filtres statiques) */}
+      <div className="app-bg-night" aria-hidden="true" />
+      <div className="app-bg-veil-night" aria-hidden="true" />
+
+      {/* Vignette pendant une tempête d'ombre */}
+      {shadowStorm && <div className="ec-storm-vignette" aria-hidden="true" />}
+
       <Header />
 
-      <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-4 overflow-y-auto p-4 lg:grid lg:grid-cols-[minmax(340px,440px)_1fr] lg:overflow-hidden">
-        {/* Colonne gauche : stats + zone de clic */}
+      <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-4 overflow-y-auto p-3 lg:grid lg:grid-cols-[minmax(360px,420px)_1fr] lg:gap-4 lg:overflow-hidden lg:p-4">
+        {/* Colonne gauche : cockpit (stats + zone de clic) */}
         <section className="flex w-full flex-col items-center gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           <StatsBar />
           <ClickArea />
         </section>
 
-        {/* Colonne droite : boutique / équipe / succès / classement */}
-        <section className="panel flex min-h-[60vh] min-w-0 flex-col overflow-hidden lg:min-h-0">
+        {/* Colonne droite : atelier (boutique, équipe, succès…) */}
+        <section className="panel flex min-h-[70vh] min-w-0 flex-col overflow-hidden lg:min-h-0">
           <TabsPanel />
         </section>
       </main>
@@ -86,6 +101,7 @@ export default function App() {
       <Toasts />
       <AuthModal />
       <OfflineModal />
+      <ChangelogModal />
     </div>
   );
 }

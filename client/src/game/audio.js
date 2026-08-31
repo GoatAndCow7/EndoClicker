@@ -99,6 +99,15 @@ function blip(freq, { type = 'sine', dur = 0.1, vol = 0.08, delay = 0 } = {}) {
   g.connect(sfxGain);
   o.start(t);
   o.stop(t + dur + 0.05);
+  // Libère le gain une fois l'oscillateur mort (pas d'accumulation)
+  o.onended = () => {
+    try {
+      g.disconnect();
+      o.disconnect();
+    } catch {
+      /* déjà déconnecté */
+    }
+  };
 }
 
 export function playClick() {
@@ -127,6 +136,31 @@ export function playApple() {
   ); // scintillement
 }
 
+// Atterrissage d'un rouleau de caisse
+export function playLand() {
+  if (!isSfxOn()) return;
+  blip(140, { type: 'square', dur: 0.08, vol: 0.04 });
+  blip(90, { type: 'sine', dur: 0.14, vol: 0.05, delay: 0.02 });
+}
+
+// Drop légendaire
+export function playLegendary() {
+  if (!isSfxOn()) return;
+  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) =>
+    blip(f, { type: 'triangle', dur: 0.35, vol: 0.07, delay: i * 0.07 })
+  ); // C5 E5 G5 C6 E6
+}
+
+// Renaissance (arpège montant + finale)
+export function playRenaissance() {
+  if (!isSfxOn()) return;
+  [261.63, 329.63, 392.0, 523.25].forEach((f, i) =>
+    blip(f, { type: 'triangle', dur: 0.5, vol: 0.07, delay: i * 0.1 })
+  );
+  blip(659.25, { type: 'triangle', dur: 0.9, vol: 0.08, delay: 0.55 });
+  blip(783.99, { type: 'triangle', dur: 1.1, vol: 0.08, delay: 0.7 });
+}
+
 // ---------- Musique (ambiance façon C418 / Minecraft) ----------
 // Nappes d'accords qui se succèdent + phrases de piano douces et espacées,
 // avec beaucoup de silence entre elles. Pentatonie majeure de Do enrichie.
@@ -146,6 +180,7 @@ const MELODY_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 987.77, 1046.5];
 let chordTimer = null;
 let phraseTimer = null;
 let lastPhrase = null;
+let chordIdx = 0;
 
 // Accord en nappe : sinus doux qui gonfle et s'éteint lentement
 function playChordPad(freqs) {

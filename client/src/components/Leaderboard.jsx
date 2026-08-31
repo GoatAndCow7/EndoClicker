@@ -37,7 +37,7 @@ export default function Leaderboard() {
 
   if (error) {
     return (
-      <div className="p-6 text-center text-sm text-slate-400">
+      <div className="empty-state text-2xs">
         Impossible de charger le classement : {error}
       </div>
     );
@@ -46,27 +46,31 @@ export default function Leaderboard() {
   if (!entries) {
     return (
       <div className="space-y-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-16 animate-pulse rounded-xl bg-white/5" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="empty-state h-[60px] animate-pulse" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {entries.length === 0 && (
-        <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
-          <p className="text-sm text-slate-400">
+        <div className="empty-state p-6">
+          <p className="text-2xs text-ink-3">
             Le classement est vide pour l’instant.
           </p>
           {user ? (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-3xs text-ink-4">
               Jouez et votre score apparaîtra automatiquement !
             </p>
           ) : (
-            <button className="btn-primary mt-3 text-sm" onClick={() => openAuth('register')}>
-              Créer un compte pour figer au classement
+            <button
+              type="button"
+              className="btn-primary focus-ring mt-3 h-11 text-2xs md:h-10"
+              onClick={() => openAuth('register')}
+            >
+              Créer un compte pour figurer au classement
             </button>
           )}
         </div>
@@ -74,49 +78,56 @@ export default function Leaderboard() {
 
       {entries.map((e, i) => {
         const isMe = user && e.pseudo.toLowerCase() === user.toLowerCase();
+        const tag = e.equippedTag && TAG_BY_ID[e.equippedTag];
+        const rarity = tag && RARITIES[tag.rarity];
         return (
           <button
             key={e.pseudo}
+            type="button"
             onClick={() => setViewing(e.pseudo)}
-            className={`flex w-full cursor-pointer items-center gap-2 rounded-xl border p-2.5 text-left transition-colors ${
+            aria-current={isMe ? 'true' : undefined}
+            className={`list-row focus-ring min-h-[60px] cursor-pointer ${
               isMe
-                ? 'border-ember-400/60 bg-ember-600/15'
-                : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
+                ? 'border-accent/50 bg-accent-overlay/20'
+                : 'hover:border-line/25 hover:bg-surface/10'
             }`}
             title={`Voir le profil de ${e.pseudo}`}
           >
-            <span className="w-7 shrink-0 text-center text-base font-extrabold tabular-nums">
+            <span className="w-7 shrink-0 text-center text-base font-extrabold tabular-nums text-ink-2">
               {i < 3 ? MEDALS[i] : i + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold leading-tight">
+              <p className="truncate text-sm font-bold leading-tight text-ink">
                 {e.pseudo}
-                {e.equippedTag && TAG_BY_ID[e.equippedTag] && (
+                {tag && rarity && (
                   <span
-                    className="ml-1.5 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-extrabold"
-                    style={{
-                      color: RARITIES[TAG_BY_ID[e.equippedTag].rarity].color,
-                      background: `${RARITIES[TAG_BY_ID[e.equippedTag].rarity].color}20`,
-                    }}
+                    className="chip ml-1.5 align-middle"
+                    style={{ borderColor: rarity.color, color: rarity.color }}
                   >
-                    {TAG_BY_ID[e.equippedTag].label}
+                    {tag.label}
                   </span>
                 )}
                 {e.renaissances > 0 && (
                   <span
-                    className="ml-1 rounded-full bg-ember-600/25 px-1.5 py-0.5 text-[10px] font-extrabold text-ember-300"
-                    title={`${e.renaissances} renaissance${e.renaissances > 1 ? 's' : ''}`}
+                    className="chip chip-accent ml-1 align-middle"
+                    title={`${e.renaissances} renaissance${
+                      e.renaissances > 1 ? 's' : ''
+                    }`}
                   >
-                    🔥×{e.renaissances}
+                    🔥 ×{e.renaissances}
                   </span>
                 )}
-                {isMe && <span className="ml-1 text-[11px] text-ember-300">(vous)</span>}
+                {isMe && (
+                  <span className="ml-1.5 align-middle text-2xs font-semibold text-accent-soft">
+                    (vous)
+                  </span>
+                )}
               </p>
-              <p className="whitespace-nowrap text-[11px] leading-tight text-slate-400">
+              <p className="mt-0.5 text-2xs leading-tight text-ink-3">
                 🏅 {e.achievements} succès
               </p>
             </div>
-            <span className="shrink-0 text-right text-sm font-extrabold tabular-nums text-ember-300">
+            <span className="shrink-0 text-right text-sm font-extrabold tabular-nums text-accent-soft">
               {fmt(e.totalEndocraft)}
             </span>
           </button>
@@ -129,10 +140,11 @@ export default function Leaderboard() {
 
       {!user && entries.length > 0 && (
         <button
-          className="btn-ghost w-full text-sm"
+          type="button"
+          className="btn-primary focus-ring h-11 w-full text-sm md:h-10"
           onClick={() => openAuth('register')}
         >
-          👆 Créez un compte pour figer au classement
+          👆 Créez un compte pour figurer au classement
         </button>
       )}
     </div>

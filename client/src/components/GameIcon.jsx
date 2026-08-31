@@ -6,6 +6,7 @@ export default function GameIcon({ icon, alt = '', className = '' }) {
       <img
         src={icon}
         alt={alt}
+        loading="lazy"
         draggable={false}
         className={`pixelated inline-block object-contain align-middle ${className}`}
       />

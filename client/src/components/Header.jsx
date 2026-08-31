@@ -13,45 +13,68 @@ import StatsPanel from './StatsPanel.jsx';
 const ADMIN_PSEUDO = 'goatandcow';
 const clickTitle = () => useGame.getState().clickTitle?.();
 
+// Squelette de modale partagé (stats, administration) : fermeture par
+// Échap, clic sur le rideau ou croix.
+function HeaderModal({ icon, title, onClose, children }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-card h-[85vh] max-w-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-head">
+          <h3 className="modal-title">
+            {icon} {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="modal-x"
+            aria-label="Fermer"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 // Bouton Stats (tout le monde) : ouvre le panneau en grand modal
 function StatsButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-white/5 p-2 text-sm text-slate-200 transition-colors hover:bg-white/10"
+        className="btn-icon focus-ring h-11 w-11 md:h-10 md:w-10"
         title="Vos statistiques"
         aria-label="Statistiques"
+        aria-haspopup="dialog"
       >
         📊
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4"
-          onClick={() => setOpen(false)}
+        <HeaderModal
+          icon="📊"
+          title="Statistiques"
+          onClose={() => setOpen(false)}
         >
-          <div
-            className="panel flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 p-3">
-              <h3 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wider text-ember-300">
-                📊 Statistiques
-              </h3>
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
-                aria-label="Fermer"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <StatsPanel />
-            </div>
-          </div>
-        </div>
+          <StatsPanel />
+        </HeaderModal>
       )}
     </>
   );
@@ -59,22 +82,32 @@ function StatsButton() {
 
 // Menu déroulant de volume : 0 = désactivé
 function VolumeMenu({ open, onClose, icon, label, volume, onChange }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
     <>
       {/* ferme au clic ailleurs */}
       <button
+        type="button"
         className="fixed inset-0 z-40 cursor-default"
         onClick={onClose}
         aria-label="Fermer le menu"
         tabIndex={-1}
       />
-      <div className="panel absolute right-0 top-full z-50 mt-2 w-52 p-3">
+      <div className="panel absolute right-0 top-full z-50 mt-2 w-56 animate-drop-in p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+          <span className="label-caps">
             {icon} {label}
           </span>
-          <span className="text-xs font-extrabold tabular-nums text-ember-300">
+          <span className="text-xs font-extrabold tabular-nums text-accent-soft">
             {volume === 0 ? 'OFF' : `${volume}%`}
           </span>
         </div>
@@ -85,9 +118,10 @@ function VolumeMenu({ open, onClose, icon, label, volume, onChange }) {
           step="5"
           value={volume}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full accent-ember-500"
+          aria-label={`Volume : ${label}`}
+          className="focus-ring w-full accent-accent"
         />
-        <p className="mt-1 text-[10px] text-slate-500">
+        <p className="mt-1 text-3xs text-ink-4">
           {volume === 0 ? 'Désactivé' : 'Baissez à 0 pour couper'}
         </p>
       </div>
@@ -97,6 +131,15 @@ function VolumeMenu({ open, onClose, icon, label, volume, onChange }) {
 
 // Menu de choix du mode d'affichage : auto (heure réelle) / jour / nuit
 function DayNightMenu({ open, onClose, pref, onChange }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
   const options = [
     { id: 'auto', label: 'Auto', hint: 'selon votre heure' },
@@ -106,29 +149,30 @@ function DayNightMenu({ open, onClose, pref, onChange }) {
   return (
     <>
       <button
+        type="button"
         className="fixed inset-0 z-40 cursor-default"
         onClick={onClose}
         aria-label="Fermer le menu"
         tabIndex={-1}
       />
-      <div className="panel absolute right-0 top-full z-50 mt-2 w-48 p-2">
+      <div className="panel absolute right-0 top-full z-50 mt-2 w-56 animate-drop-in p-2">
         {options.map((o) => (
           <button
+            type="button"
             key={o.id}
             onClick={() => {
               onChange(o.id);
               onClose();
             }}
-            className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-colors ${
+            aria-pressed={pref === o.id}
+            className={`focus-ring flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-colors ${
               pref === o.id
-                ? 'bg-ember-600/25 text-ember-200'
-                : 'text-slate-300 hover:bg-white/5'
+                ? 'bg-accent-overlay/60 text-accent-bright'
+                : 'text-ink-2 hover:bg-surface/5'
             }`}
           >
             <span>{o.label}</span>
-            <span className="text-[10px] font-normal text-slate-500">
-              {o.hint}
-            </span>
+            <span className="text-3xs font-normal text-ink-4">{o.hint}</span>
           </button>
         ))}
       </div>
@@ -155,26 +199,28 @@ function AudioControls() {
   return (
     <div ref={wrapRef} className="relative flex items-center gap-1">
       <button
+        type="button"
         onClick={() => setOpen(open === 'sfx' ? null : 'sfx')}
-        className={`rounded-lg p-2 text-sm transition-colors ${
-          sfxVol > 0
-            ? 'bg-white/5 text-slate-200 hover:bg-white/10'
-            : 'bg-white/5 text-slate-500 hover:bg-white/10'
+        className={`btn-icon focus-ring h-11 w-11 md:h-10 md:w-10 ${
+          sfxVol === 0 ? 'is-off' : ''
         }`}
         title={`Effets sonores — ${sfxVol === 0 ? 'désactivés' : sfxVol + '%'}`}
         aria-label="Volume des effets sonores"
+        aria-expanded={open === 'sfx'}
+        aria-haspopup="menu"
       >
         {sfxVol > 0 ? '🔊' : '🔇'}
       </button>
       <button
+        type="button"
         onClick={() => setOpen(open === 'music' ? null : 'music')}
-        className={`rounded-lg p-2 text-sm transition-colors ${
-          musicVol > 0
-            ? 'bg-white/5 text-slate-200 hover:bg-white/10'
-            : 'bg-white/5 text-slate-500 opacity-60 hover:bg-white/10'
+        className={`btn-icon focus-ring h-11 w-11 md:h-10 md:w-10 ${
+          musicVol === 0 ? 'is-off' : ''
         }`}
         title={`Musique — ${musicVol === 0 ? 'désactivée' : musicVol + '%'}`}
         aria-label="Volume de la musique"
+        aria-expanded={open === 'music'}
+        aria-haspopup="menu"
       >
         {musicVol > 0 ? '🎵' : '🔕'}
       </button>
@@ -233,10 +279,13 @@ function DayNightControl() {
   return (
     <div ref={wrapRef} className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="rounded-lg bg-white/5 p-2 text-sm text-slate-200 transition-colors hover:bg-white/10"
+        className="btn-icon focus-ring h-11 w-11 md:h-10 md:w-10"
         title={`Ambiance : ${label}`}
         aria-label="Mode jour ou nuit"
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         {icon}
       </button>
@@ -258,35 +307,45 @@ export default function Header() {
   const isAdmin = user && user.toLowerCase() === ADMIN_PSEUDO;
 
   return (
-    <header className="flex items-center justify-between gap-4 px-4 py-3 lg:px-6">
-      <div className="flex items-center gap-3">
+    <header className="flex h-14 items-center justify-between gap-4 border-b border-line/10 bg-panelbg/80 px-4 lg:h-16 lg:px-6">
+      <div className="flex min-w-0 items-center gap-3">
         <img
           src="/logo.png"
           alt="EndoCraft"
-          className="h-10 w-10 rounded-lg object-cover lg:h-12 lg:w-12"
+          className="h-9 w-9 shrink-0 rounded-lg object-cover lg:h-11 lg:w-11"
         />
-        <div>
-          <h1
-            onClick={clickTitle}
-            className="shine-text cursor-pointer select-none text-xl font-extrabold tracking-wide lg:text-2xl"
-            title="EndoClicker"
-          >
-            EndoClicker
-          </h1>
-          <p className="hidden text-xs text-slate-400 sm:block">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-extrabold tracking-wide lg:text-2xl">
+              <button
+                type="button"
+                onClick={clickTitle}
+                className="shine-text focus-ring cursor-pointer select-none"
+                aria-label="EndoClicker (petit secret caché)"
+                title="EndoClicker"
+              >
+                EndoClicker
+              </button>
+            </h1>
+            <span className="hidden items-center rounded-full border border-accent/30 bg-accent-overlay/40 px-2 py-0.5 text-3xs font-bold uppercase tracking-widest text-accent-soft/90 sm:inline-flex">
+              V2
+            </span>
+          </div>
+          <p className="hidden text-2xs text-ink-3 lg:block">
             Cliquez, minez, régnez sur l’économie de l’End
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 lg:gap-2">
         <AudioControls />
         <DayNightControl />
         <StatsButton />
         {user ? (
           <>
             <button
-              className="btn-ghost text-sm"
+              type="button"
+              className="btn-ghost focus-ring h-11 text-sm md:h-10"
               onClick={logout}
               title="Se déconnecter (votre progression reste sauvegardée dans le cloud)"
             >
@@ -294,25 +353,36 @@ export default function Header() {
             </button>
             {isAdmin && (
               <button
+                type="button"
                 onClick={() => setShowAdmin(true)}
-                className="rounded-lg bg-white/5 p-2 text-sm text-slate-200 transition-colors hover:bg-white/10"
+                className="btn-icon focus-ring h-11 w-11 md:h-10 md:w-10"
                 title="Panel d'administration"
                 aria-label="Panel d'administration"
+                aria-expanded={showAdmin}
+                aria-haspopup="dialog"
               >
                 🛠️
               </button>
             )}
-            <span className="hidden items-center gap-2 rounded-full border border-ember-500/30 bg-ember-950/40 px-3 py-1.5 text-sm font-semibold text-ember-200 sm:flex">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              {user}
+            <span className="flex h-11 max-w-[40vw] items-center gap-2 rounded-full border border-accent/30 bg-accent-overlay/40 px-3 text-sm font-semibold text-accent-bright transition-colors hover:bg-accent-overlay/60 md:h-10">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-success" />
+              <span className="truncate">{user}</span>
             </span>
           </>
         ) : (
           <>
-            <button className="btn-ghost text-sm" onClick={() => openAuth('login')}>
+            <button
+              type="button"
+              className="btn-ghost focus-ring h-11 text-sm md:h-10"
+              onClick={() => openAuth('login')}
+            >
               Se connecter
             </button>
-            <button className="btn-primary text-sm" onClick={() => openAuth('register')}>
+            <button
+              type="button"
+              className="btn-primary focus-ring h-11 text-sm md:h-10"
+              onClick={() => openAuth('register')}
+            >
               S’inscrire
             </button>
           </>
@@ -321,31 +391,13 @@ export default function Header() {
 
       {/* Panel d'administration (grand modal) */}
       {showAdmin && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4"
-          onClick={() => setShowAdmin(false)}
+        <HeaderModal
+          icon="🛠️"
+          title="Administration"
+          onClose={() => setShowAdmin(false)}
         >
-          <div
-            className="panel flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 p-3">
-              <h3 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wider text-ember-300">
-                🛠️ Administration
-              </h3>
-              <button
-                onClick={() => setShowAdmin(false)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
-                aria-label="Fermer"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <AdminPanel />
-            </div>
-          </div>
-        </div>
+          <AdminPanel />
+        </HeaderModal>
       )}
     </header>
   );
