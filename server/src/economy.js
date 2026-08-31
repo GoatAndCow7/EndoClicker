@@ -12,6 +12,11 @@
 // les tables viennent directement du fichier de constantes du jeu,
 // donc impossible qu'elles divergent lors d'un rééquilibrage.
 
+// Les tables viennent d'une copie locale des constantes du jeu
+// (server/src/game/) : le serveur est autonome, aucune dépendance aux
+// sources du client dans l'image. Le test test-economy.mjs vérifie
+// byte à byte que la copie colle au fichier client — après un
+// rééquilibrage, recopier constants.js et format.js.
 import {
   GENERATORS,
   UPGRADES,
@@ -23,7 +28,7 @@ import {
   COST_FACTOR,
   CLICK_PRODUCTION_SHARE,
   getRenaissanceMult,
-} from '../../client/src/game/constants.js';
+} from './game/constants.js';
 
 // Marges : toujours généreuses pour un joueur honnête, mortelles pour
 // un état forgé. Un joueur parfait 24/7 qui attrape toutes les pommes

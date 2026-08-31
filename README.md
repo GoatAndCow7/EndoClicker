@@ -217,9 +217,11 @@ Le jeu tourne dans le navigateur : le localStorage et le store sont
 modifiables par n'importe qui (script injecté, devtools). Impossible à
 empêcher — la protection est donc entièrement côté serveur, à la
 sauvegarde. Le principe : **un état poussé doit être payable et
-produisible**, recalculé depuis les tables du jeu
-(`server/src/economy.js` importe directement les constantes du client :
-une seule source de vérité, zéro divergence au rééquilibrage).
+produisible**, recalculé depuis les tables du jeu (copie locale dans
+`server/src/game/` : le serveur est autonome dans l'image, et le test
+`test-economy.mjs` vérifie byte à byte que la copie colle aux
+constantes du client — après un rééquilibrage, recopier
+`constants.js` et `format.js`, le test refuse toute dérive).
 
 - **Identité cycle / à vie** : chaque gain crédite le total du cycle ET
   le total à vie, la Renaissance remet le cycle à zéro et fige l'ancre.
@@ -315,6 +317,7 @@ server/            API Express + SQLite
     auth.js        Inscription / connexion
     db.js          Base SQLite, compte admin, reset mondial (version du monde)
     economy.js     Invariantes économiques (miroir des formules du jeu)
+    game/          Copie locale des tables du jeu (vérifiée par le test)
     state.js       Sauvegarde cloud + anti-triche
     leaderboard.js Classement et profils publics
     events.js      Flux SSE

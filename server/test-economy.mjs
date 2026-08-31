@@ -1,12 +1,22 @@
 // Tests des invariantes économiques (lancé depuis server/)
 import { verifyEconomy, inventorySpent, theoreticalProduction } from './src/economy.js';
 import { ACHIEVEMENTS } from '../client/src/game/constants.js';
+import { readFileSync } from 'node:fs';
 
 const HOUR = 3600_000;
 let pass = 0, fail = 0;
 function check(name, cond) {
   if (cond) { pass++; console.log(`  ok  ${name}`); }
   else { fail++; console.log(`FAIL  ${name}`); }
+}
+
+// --- 0. Dérive des tables : le miroir serveur doit être la copie exacte
+//     des constantes du client. Après un rééquilibrage du jeu,
+//     recopier constants.js et format.js dans server/src/game/.
+for (const f of ['constants.js', 'format.js']) {
+  const client = readFileSync(`../client/src/game/${f}`, 'utf8');
+  const server = readFileSync(`./src/game/${f}`, 'utf8');
+  check(`table ${f} : copie serveur identique au client`, client === server);
 }
 
 // --- 1. Débutant honnête : 2 h de jeu, quelques générateurs ---
