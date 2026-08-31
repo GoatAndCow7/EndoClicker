@@ -30,7 +30,8 @@ const RARITY_ORDER = { commun: 0, rare: 1, epique: 2, legendaire: 3 };
 
 const rarityClass = (r) => (RARITIES[r] ? `rarity-${r}` : 'rarity-commun');
 
-// Représentation affichable d'un drop (carte du rouleau, révélation, modal)
+// Représentation affichable d'un drop (carte du rouleau, révélation, modal).
+// La description explique CE QUE FAIT l'objet, concrètement — pas du blabla.
 function dropView(drop) {
   if (!drop) return { emoji: '❓', name: '—' };
   const dupText = `Doublon — vous le possédiez déjà. Remboursé : +${fmt(
@@ -44,7 +45,9 @@ function dropView(drop) {
       emoji: null,
       name: u?.name || drop.upgradeId,
       desc: u?.desc,
-      reward: drop.duplicate ? dupText : null,
+      reward: drop.duplicate
+        ? dupText
+        : 'Effet permanent, déjà actif sur votre compte. Pas besoin de l’équiper.',
     };
   }
   if (drop.type === 'skin') {
@@ -54,10 +57,11 @@ function dropView(drop) {
       icon: null,
       emoji: '🪙',
       name: sk?.name || drop.skinId,
-      desc: sk?.desc,
+      desc:
+        'Skin légendaire pour votre pièce : production ×1,5 TANT qu’il est équipé. À équiper dans l’onglet Cosmétiques (l’effet s’arrête si vous changez de skin). Conservé après une Renaissance.',
       reward: drop.duplicate
         ? dupText
-        : 'Skin équipable dans l’onglet Cosmétiques — effets assortis inclus.',
+        : 'Débloqué dans l’onglet Cosmétiques — équipez-le pour activer le bonus.',
     };
   }
   if (drop.type === 'tag') {
@@ -66,9 +70,11 @@ function dropView(drop) {
       rarity: drop.rarity,
       icon: null,
       emoji: '🏷️',
-      name: tag?.label || drop.tagId,
-      desc: 'Tag de prestige affiché à côté de votre pseudo au classement et sur votre profil.',
-      reward: drop.duplicate ? dupText : 'Équipable dans l’onglet Cosmétiques.',
+      name: `Tag « ${tag?.label || drop.tagId} »`,
+      desc: 'Un titre de prestige affiché à côté de votre pseudo, au classement et sur votre profil public. Purement cosmétique — mais c’est la classe.',
+      reward: drop.duplicate
+        ? dupText
+        : 'À équiper dans l’onglet Cosmétiques, section Tags.',
     };
   }
   if (drop.type === 'nothing') {
@@ -77,37 +83,46 @@ function dropView(drop) {
       icon: null,
       emoji: '🕳️',
       name: drop.label,
-      desc: 'Vous avez payé pour rien. C’est la magie des caisses.',
+      desc: 'Rien du tout. (Ce drop n’existe plus dans les tables V2.)',
       reward: null,
     };
   }
   if (drop.type === 'bank') {
+    const pct = Math.round(drop.bankPercent * 100);
     return {
       rarity: drop.rarity,
       icon: null,
       emoji: '🏦',
       name: drop.label,
-      desc: 'Un pourcentage de votre banque actuelle, versé immédiatement.',
+      desc: `Vous touchez ${pct} % de votre banque ACTUELLE, versés immédiatement sur votre solde. Plus vous êtes riche, plus ça paie — le gain est plafonné à 3× le prix de la caisse.`,
       reward: null,
     };
   }
   if (drop.type === 'cash') {
+    const pctText = Math.round(drop.percent * 100);
+    const desc =
+      drop.percent < 1
+        ? `Le lot de consolation : ${pctText} % du prix de la caisse, versés immédiatement sur votre solde. Ça ne rembourse pas la caisse, mais on ne repart jamais les poches vides.`
+        : `${pctText} % du prix de la caisse versés immédiatement sur votre solde, sans condition.${
+            drop.percent === 1 ? ' La caisse est remboursée.' : ''
+          }`;
     return {
       rarity: drop.rarity,
       icon: null,
-      emoji: '💰',
+      emoji: drop.percent < 1 ? '🪙' : '💰',
       name: drop.label,
-      desc: 'Des EndoCraft versés immédiatement sur votre solde, sans condition.',
+      desc,
       reward: null,
     };
   }
   if (drop.type === 'frenzy') {
+    const secs = Math.round(drop.durationMs / 1000);
     return {
       rarity: drop.rarity,
       icon: null,
       emoji: '🔥',
       name: drop.label,
-      desc: 'Frénésie ×7 appliquée immédiatement — cliquez comme un damné.',
+      desc: `Pendant ${secs} s, chaque clic (et chaque clic de votre auto-clicker) rapporte ×7. Si une frénésie est déjà active, on garde la meilleure des deux. Durée +25 % avec le skin EndoBlaze équipé.`,
       reward: null,
     };
   }
@@ -117,7 +132,7 @@ function dropView(drop) {
       icon: null,
       emoji: '🌧️',
       name: drop.label,
-      desc: 'Une pluie de pommes déclenchée sur-le-champ : attrapez-les !',
+      desc: 'Une pluie de pommes tombe pendant 10 s : chacune que vous attrapez rapporte 1 % de votre banque (10 pommes au maximum). Cliquez vite avant qu’elles touchent le sol !',
       reward: null,
     };
   }
@@ -739,7 +754,7 @@ export default function CasesPanel() {
                     key={n}
                     onClick={() => can && setOpening({ box, count: n })}
                     disabled={!can}
-                    className={`focus-ring h-11 w-24 justify-center text-2xs md:h-10 ${
+                    className={`focus-ring h-11 w-28 flex-col gap-0 justify-center text-2xs leading-tight md:h-10 ${
                       can
                         ? n === 1
                           ? 'btn btn-primary'
@@ -752,8 +767,10 @@ export default function CasesPanel() {
                         : `Ouvrir ${n} caisses d'un coup (${fmt(box.cost * n)})`
                     }
                   >
-                    ×{n}{' '}
-                    <span className="tabular-nums opacity-70">
+                    <span className="font-bold">×{n}</span>
+                    {/* whitespace-nowrap : le montant reste soudé à son
+                        unité (1 M, 5 B…) sur une seule ligne */}
+                    <span className="whitespace-nowrap tabular-nums opacity-80">
                       🪙 {fmt(box.cost * n)}
                     </span>
                   </button>
