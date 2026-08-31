@@ -1,5 +1,10 @@
 import { GENERATORS, UPGRADES } from '../game/constants';
-import { useGame, generatorsCost, getStaffMults } from '../game/store';
+import {
+  useGame,
+  generatorsCost,
+  getStaffMults,
+  getProduction,
+} from '../game/store';
 import { fmt } from '../game/format';
 import { fx } from '../game/fx';
 import GameIcon from './GameIcon.jsx';
@@ -33,6 +38,8 @@ export default function Shop({ amount = 1 }) {
   const generators = useGame((s) => s.generators);
   const upgrades = useGame((s) => s.upgrades);
   const staff = useGame((s) => s.staff);
+  const renaissances = useGame((s) => s.renaissances);
+  const equippedCoin = useGame((s) => s.equippedCoin);
   const buyGenerator = useGame((s) => s.buyGenerator);
 
   // La remise (Zoxxio & co) vit dans getStaffMults : il lui faut le state
@@ -46,6 +53,18 @@ export default function Shop({ amount = 1 }) {
       genMult[u.genId] = (genMult[u.genId] || 1) * u.mult;
     }
   }
+
+  // Ratio entre la production de base (Σ possédés × taux de base) et la
+  // production réelle (globals × Renaissance × équipe × skin) : les taux
+  // affichés dans les lignes, une fois tous additionnés, tombent exactement
+  // sur le « Par seconde » du cockpit.
+  const snapshot = { generators, upgrades, staff, renaissances, equippedCoin };
+  const baseSum = GENERATORS.reduce(
+    (a, g) =>
+      a + (generators[g.id] || 0) * g.baseRate * (genMult[g.id] || 1),
+    0
+  );
+  const realMult = baseSum > 0 ? getProduction(snapshot) / baseSum : 1;
 
   const handleBuy = (e, gen) => {
     // ×Max se recalcule PAR générateur au moment du clic : la banque bouge vite
@@ -79,7 +98,8 @@ export default function Shop({ amount = 1 }) {
         // Le prix affiché est le coût TOTAL du lot (au moins 1 pour l'affichage)
         const cost = generatorsCost(gen, owned, Math.max(1, count), discount);
         const affordable = amount === 'max' ? count >= 1 : endocraft >= cost;
-        const realRate = gen.baseRate * (genMult[gen.id] || 1);
+        // Taux réel par exemplaire, tous multiplicateurs compris
+        const realRate = gen.baseRate * (genMult[gen.id] || 1) * realMult;
         // Un générateur jamais acheté et trop cher reste mystérieux
         const hidden =
           owned === 0 && gen.baseCost > endocraft * 20 && gen.baseCost > 100;
@@ -113,6 +133,9 @@ export default function Shop({ amount = 1 }) {
                   >
                     <span key={owned} className="ec-count-bump">
                       ×{owned}
+                    </span>
+                    <span className="font-semibold opacity-80">
+                      · {fmt(owned * realRate)}/s
                     </span>
                   </span>
                 )}
