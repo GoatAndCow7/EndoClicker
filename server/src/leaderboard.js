@@ -1,19 +1,42 @@
 import { Router } from 'express';
-import { db } from './db.js';
+import { db, now } from './db.js';
+import { verifyEconomy } from './economy.js';
 
 export const leaderboardRouter = Router();
 
+// Un état stocké ne peut plus mentir : s'il est économiquement
+// impossible (édition locale synchronisée avant le renforcement),
+// il reste en base mais n'apparaît plus au classement.
+function isPlausible(state, accountAgeMs) {
+  try {
+    return verifyEconomy(state, { accountAgeMs }).ok;
+  } catch {
+    return false;
+  }
+}
+
 leaderboardRouter.get('/leaderboard', (req, res) => {
+  const t = now();
+  // On récupère plus que 20 : les états impossibles sont filtrés ensuite.
   const rows = db
     .prepare(
-      `SELECT u.pseudo, s.total_endocraft, s.achievements, s.renaissances, s.state, s.updated_at
+      `SELECT u.pseudo, u.created_at, s.total_endocraft, s.achievements, s.renaissances, s.state, s.updated_at
        FROM states s JOIN users u ON u.id = s.user_id
        ORDER BY s.total_endocraft DESC
-       LIMIT 20`
+       LIMIT 60`
     )
     .all();
+  const clean = rows.filter((r) => {
+    let state = null;
+    try {
+      state = JSON.parse(r.state);
+    } catch {
+      return false;
+    }
+    return isPlausible(state, Math.max(0, t - r.created_at));
+  });
   res.json({
-    leaderboard: rows.map((r) => {
+    leaderboard: clean.slice(0, 20).map((r) => {
       let equippedTag = null;
       try {
         equippedTag = JSON.parse(r.state)?.equippedTag || null;
@@ -47,13 +70,13 @@ leaderboardRouter.get('/profile/:pseudo', (req, res) => {
     )
     .get(user.id);
 
+  const state = row ? JSON.parse(row.state) : {};
   const rank = row
     ? db
         .prepare('SELECT COUNT(*) + 1 AS r FROM states WHERE total_endocraft > ?')
         .get(row.total_endocraft).r
     : null;
 
-  const state = row ? JSON.parse(row.state) : {};
   res.json({
     profile: {
       pseudo: user.pseudo,
@@ -72,7 +95,8 @@ leaderboardRouter.get('/profile/:pseudo', (req, res) => {
       tags: state.tags || [],
       casesOpened: state.casesOpened || 0,
       caseLegendaryDrops: state.caseLegendaryDrops || 0,
-      rank,
+      // Un état économiquement impossible n'a pas de place au classement.
+      rank: row && isPlausible(state, Math.max(0, now() - user.created_at)) ? rank : null,
     },
   });
 });

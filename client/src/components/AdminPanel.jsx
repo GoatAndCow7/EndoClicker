@@ -231,6 +231,13 @@ function UserEditor({ userId, onClose, onSaved }) {
               {error}
             </p>
           )}
+          {user.flagged && !antiCheatOff && (
+            <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-bright">
+              ⚠️ État économiquement impossible : progression très probablement
+              éditée en local. Le joueur n'apparaît plus au classement — sa
+              prochaine sauvegarde cloud sera refusée. Pense à le réinitialiser.
+            </p>
+          )}
 
           {/* Monnaie */}
           <section className="panel-flat rounded-xl p-3">
@@ -243,13 +250,13 @@ function UserEditor({ userId, onClose, onSaved }) {
                 label="Total à vie (Renaissance)"
                 value={state.lifetimeEndocraft || 0}
                 onChange={(v) => patchState({ lifetimeEndocraft: Math.max(0, Number(v) || 0) })}
-                suffix="Seuil Renaissance : 1 T à vie"
+                suffix="Cumulé, jamais remis à zéro"
               />
               <NumberField
                 label="Renaissances"
                 value={state.renaissances || 0}
                 onChange={(v) => patchState({ renaissances: Math.max(0, Math.floor(Number(v) || 0)) })}
-                suffix="×15 % de production chacune"
+                suffix="Bonus de production permanent"
               />
               <NumberField
                 label="Caisses ouvertes"

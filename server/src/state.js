@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db, now } from './db.js';
 import { requireAuth } from './middleware/auth.js';
+import { verifyEconomy } from './economy.js';
 
 export const stateRouter = Router();
 
@@ -48,22 +49,44 @@ stateRouter.put('/state', requireAuth, (req, res) => {
 
   const row = readState(req.user.id);
 
-  if (row) {
-    // L'état a été modifié par un administrateur depuis la dernière synchro :
-    // on renvoie la version autoritaire, le client doit l'appliquer.
-    if (row.rev > clientRev) {
-      return res.status(409).json({
-        error: 'État modifié par un administrateur',
-        state: JSON.parse(row.state),
-        rev: row.rev,
+  // L'état a été modifié par un administrateur depuis la dernière synchro :
+  // on renvoie la version autoritaire, le client doit l'appliquer.
+  if (row && row.rev > clientRev) {
+    return res.status(409).json({
+      error: 'État modifié par un administrateur',
+      state: JSON.parse(row.state),
+      rev: row.rev,
+    });
+  }
+
+  const user = db
+    .prepare('SELECT last_login_at, created_at FROM users WHERE id = ?')
+    .get(req.user.id);
+  const accountAgeMs = user ? Math.max(0, t - user.created_at) : null;
+
+  // Invariantes économiques : l'état poussé doit être payable (on ne
+  // possède que ce qu'on a pu s'offrir) et produisible (les gains
+  // tiennent dans le temps de jeu réel). Recalculé depuis les tables
+  // du jeu — un état forgé en local, lui, ne tient jamais.
+  let safeRate = rate;
+  if (!row || !row.anti_cheat_disabled) {
+    const audit = verifyEconomy(state, { accountAgeMs, declaredRate: rate });
+    if (!audit.ok) {
+      console.warn(
+        `[anti-triche] sauvegarde refusée pour ${req.user.id} (${audit.reason})`
+      );
+      return res.status(422).json({
+        error: 'Progression implausible, sauvegarde refusée',
       });
     }
+    // Le taux déclaré ne peut pas élever le plafond au-delà de ce que
+    // l'état peut réellement produire.
+    safeRate = Math.min(rate, audit.maxRate);
+  }
 
+  if (row) {
     // Migration : juste après un login, l'appareil peut pousser une
     // progression locale en avance (farm en invité puis connexion).
-    const user = db
-      .prepare('SELECT last_login_at FROM users WHERE id = ?')
-      .get(req.user.id);
     const isMigration =
       migration === true &&
       user &&
@@ -83,11 +106,26 @@ stateRouter.put('/state', requireAuth, (req, res) => {
         : elapsed;
       const effectiveRate = Math.max(
         row.baseline_rate,
-        cappedRate(row.baseline_rate, rate)
+        cappedRate(row.baseline_rate, safeRate)
       );
       const allowance = Math.max(5000, row.total_endocraft * 0.35);
       const maxGain = effectiveRate * lookback * RATE_TOLERANCE + allowance;
       if (total > row.total_endocraft + maxGain) {
+        return res.status(422).json({
+          error: 'Progression implausible, sauvegarde refusée',
+        });
+      }
+      // Même fenêtre pour le total à vie (pas de colonne dédiée : il est
+      // relu de l'état stocké). Sans ça, un état forgé gonflerait sa
+      // progression « historique » pour faire passer l'inventaire.
+      const lifetime = Math.max(0, Number(state.lifetimeEndocraft) || 0);
+      let storedLifetime = 0;
+      try {
+        storedLifetime = Number(JSON.parse(row.state).lifetimeEndocraft) || 0;
+      } catch {
+        /* état stocké illisible : borne à zéro */
+      }
+      if (lifetime > storedLifetime + maxGain) {
         return res.status(422).json({
           error: 'Progression implausible, sauvegarde refusée',
         });
@@ -106,7 +144,7 @@ stateRouter.put('/state', requireAuth, (req, res) => {
       achievements,
       renaissances,
       t,
-      rate,
+      safeRate,
       t,
       req.user.id
     );
@@ -114,7 +152,7 @@ stateRouter.put('/state', requireAuth, (req, res) => {
     // Première sauvegarde (ex: migration d'une session invité) :
     // bornée par ce que la production déclarée peut produire en 7 jours.
     const maxFirst =
-      rate * (MAX_MIGRATION_LOOKBACK_MS / 1000) * RATE_TOLERANCE + 1e9;
+      safeRate * (MAX_MIGRATION_LOOKBACK_MS / 1000) * RATE_TOLERANCE + 1e9;
     if (total > maxFirst) {
       return res.status(422).json({
         error: 'Progression implausible, sauvegarde refusée',
@@ -124,7 +162,7 @@ stateRouter.put('/state', requireAuth, (req, res) => {
       `INSERT INTO states (user_id, state, total_endocraft, achievements,
        renaissances, baseline_at, baseline_rate, rev, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`
-    ).run(req.user.id, JSON.stringify({ ...state, rev: 0 }), total, achievements, renaissances, t, rate, t);
+    ).run(req.user.id, JSON.stringify({ ...state, rev: 0 }), total, achievements, renaissances, t, safeRate, t);
   }
 
   db.prepare('UPDATE users SET updated_at = ? WHERE id = ?').run(t, req.user.id);

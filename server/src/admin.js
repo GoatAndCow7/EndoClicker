@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { db, now, ADMIN_PSEUDO } from './db.js';
 import { requireAuth, isAdmin } from './middleware/auth.js';
 import { sendToUser, isOnline } from './events.js';
+import { verifyEconomy } from './economy.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, isAdmin);
@@ -77,6 +78,21 @@ function getUserWithState(id) {
       'SELECT state, total_endocraft, achievements, rev, anti_cheat_disabled, updated_at FROM states WHERE user_id = ?'
     )
     .get(id);
+  const state = row ? JSON.parse(row.state) : null;
+
+  // L'état stocké est-il économiquement possible ? Si non, le joueur
+  // a très probablement synchronisé une progression éditée en local.
+  let flagged = false;
+  if (state) {
+    try {
+      flagged = !verifyEconomy(state, {
+        accountAgeMs: Math.max(0, now() - user.created_at),
+      }).ok;
+    } catch {
+      flagged = true;
+    }
+  }
+
   return {
     ...user,
     totalEndocraft: row ? row.total_endocraft : 0,
@@ -85,20 +101,31 @@ function getUserWithState(id) {
     antiCheatDisabled: row ? !!row.anti_cheat_disabled : false,
     online: isOnline(user.id),
     stateUpdatedAt: row ? row.updated_at : null,
-    state: row ? JSON.parse(row.state) : null,
+    state,
+    flagged,
   };
 }
 
 function saveAdminState(userId, state, productionRate = 0) {
   const t = now();
   const row = db.prepare('SELECT rev, baseline_rate FROM states WHERE user_id = ?').get(userId);
+  const user = db.prepare('SELECT created_at FROM users WHERE id = ?').get(userId);
   const newRev = (row ? row.rev : 0) + 1;
   const stored = { ...state, rev: newRev };
+
+  // Un cadeau admin (inventaire offert sans le total à vie correspondant)
+  // ne passerait jamais la validation économique : on lève l'anti-triche
+  // pour ce joueur, sinon sa prochaine synchro serait refusée à jamais.
+  const gifted = !verifyEconomy(state, {
+    accountAgeMs: user ? Math.max(0, t - user.created_at) : null,
+    declaredRate: productionRate,
+  }).ok;
 
   if (row) {
     db.prepare(
       `UPDATE states SET state = ?, total_endocraft = ?, achievements = ?, renaissances = ?,
-       baseline_at = ?, baseline_rate = MAX(baseline_rate, ?), rev = ?, updated_at = ?
+       baseline_at = ?, baseline_rate = MAX(baseline_rate, ?), rev = ?, updated_at = ?,
+       anti_cheat_disabled = CASE WHEN ? THEN 1 ELSE anti_cheat_disabled END
        WHERE user_id = ?`
     ).run(
       JSON.stringify(stored),
@@ -109,13 +136,14 @@ function saveAdminState(userId, state, productionRate = 0) {
       Math.max(0, Number(productionRate) || 0), // taux recalculé pour la suite
       newRev,
       t,
+      gifted ? 1 : 0,
       userId
     );
   } else {
     db.prepare(
       `INSERT INTO states (user_id, state, total_endocraft, achievements,
-       renaissances, baseline_at, baseline_rate, rev, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       renaissances, baseline_at, baseline_rate, rev, anti_cheat_disabled, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       userId,
       JSON.stringify(stored),
@@ -125,6 +153,7 @@ function saveAdminState(userId, state, productionRate = 0) {
       t,
       Math.max(0, Number(productionRate) || 0),
       newRev,
+      gifted ? 1 : 0,
       t
     );
   }

@@ -24,6 +24,10 @@ COPY server/src ./src
 # Front buildé servi par Express
 COPY --from=client-build /build/client/dist ./client/dist
 
+# Tables du jeu (prix, taux) : le serveur les relit pour valider les
+# sauvegardes poussées — une seule source de vérité, zéro divergence.
+COPY client/src/game/constants.js client/src/game/format.js ./client/src/game/
+
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000

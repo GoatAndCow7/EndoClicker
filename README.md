@@ -210,6 +210,49 @@ Le volume contient comptes, progressions et classement : ne le supprimez pas. Au
 | `/api/events` | GET (SSE) | oui | Flux temps réel (token en query string : EventSource n'envoie pas d'en-têtes) |
 | `/api/admin/*` | divers | admin | Gestion des joueurs |
 
+## Anti-triche
+
+Le jeu tourne dans le navigateur : le localStorage et le store sont
+modifiables par n'importe qui (script injecté, devtools). Impossible à
+empêcher — la protection est donc entièrement côté serveur, à la
+sauvegarde. Le principe : **un état poussé doit être payable et
+produisible**, recalculé depuis les tables du jeu
+(`server/src/economy.js` importe directement les constantes du client :
+une seule source de vérité, zéro divergence au rééquilibrage).
+
+- **Inventaire ≤ gains** : le coût cumulé des générateurs (série
+  géométrique ×1,15), améliorations, recrutements et cosmétiques ne
+  peut pas dépasser le total à vie (+ braises des renaissances, marge
+  20 %). « Tout se give » avec un total à vie ridicule meurt ici.
+- **Gains plausibles** : total du cycle et total à vie bornés par la
+  production théorique de l'état × le temps réel (âge du compte, +7 j
+  de farm invité possible avant inscription) × 6 (frénésies, pommes,
+  caisses pour un joueur parfait 24/7), + la part des clics.
+- **Renaissances cohérentes** : le cumul des seuils (500 B × 3ⁿ) doit
+  tenir dans le total à vie — une boucle de renaissances forgée est
+  mathématiquement impossible à faire passer.
+- **Taux déclaré plafonné** par la capacité réelle de l'état (frénésie
+  ×7 + marge) : le plafond de la fenêtre anti-triche ne peut plus être
+  gonflé par une fausse déclaration.
+- **Compteurs bornés** : clics ≤ 30/s de temps de jeu, succès et staff
+  ≤ catalogue, aucune valeur infinie.
+
+En pratique :
+
+- Sauvegarde refusée → `422`, le client rejouera sa sync plus tard
+  (aucune perte pour un joueur honnête, les marges sont large).
+- Un état déjà en base qui devient impossible (sync d'avant le
+  renforcement) **disparaît du classement** et son profil ressort
+  non classé.
+- Le panneau admin affiche « état économiquement impossible » sur la
+  fiche du joueur (bouton Réinitialiser à côté).
+- Offrir de l'inventaire via l'admin lève l'anti-triche pour ce joueur
+  (sinon sa prochaine sync serait refusée) — réactivable d'un clic.
+
+Les marges et les formules sont testées dans `server/test-economy.mjs`
+(`node test-economy.mjs` depuis `server/`) : à relancer après tout
+rééquilibrage des tables.
+
 ## Structure du projet
 
 ```
@@ -225,10 +268,12 @@ server/            API Express + SQLite
     index.js       Bootstrap Express + front statique
     auth.js        Inscription / connexion
     db.js          Base SQLite, compte admin, reset mondial (version du monde)
+    economy.js     Invariantes économiques (miroir des formules du jeu)
     state.js       Sauvegarde cloud + anti-triche
     leaderboard.js Classement et profils publics
     events.js      Flux SSE
     admin.js       Routes d'administration
+  test-economy.mjs Tests des invariantes anti-triche
 Dockerfile         Image de production
 ```
 
