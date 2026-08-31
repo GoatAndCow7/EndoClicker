@@ -5,6 +5,7 @@ import {
   getStaffMults,
   getProduction,
 } from '../game/store';
+import { useThrottledEndocraft } from '../game/hooks';
 import { fmt } from '../game/format';
 import { fx } from '../game/fx';
 import GameIcon from './GameIcon.jsx';
@@ -34,7 +35,8 @@ function maxBuyable(gen, owned, balance, discount) {
 }
 
 export default function Shop({ amount = 1 }) {
-  const endocraft = useGame((s) => s.endocraft);
+  // Solde throttlé : 16 lignes ne se re-rendent pas à chaque clic
+  const endocraft = useThrottledEndocraft();
   const generators = useGame((s) => s.generators);
   const upgrades = useGame((s) => s.upgrades);
   const staff = useGame((s) => s.staff);

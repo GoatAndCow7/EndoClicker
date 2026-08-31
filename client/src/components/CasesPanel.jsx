@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame } from '../game/store';
+import { useThrottledEndocraft } from '../game/hooks';
 import { fmt } from '../game/format';
 import {
   CASES,
@@ -312,6 +313,7 @@ function ContentsModal({ box, onClose }) {
 // Modal d'ouverture : un rouleau par caisse (jusqu'à 5 en parallèle)
 function CaseOpeningModal({ box, count = 1, onDone }) {
   const openCase = useGame((s) => s.openCase);
+  const claimCase = useGame((s) => s.claimCase);
   const [phase, setPhase] = useState('spin'); // spin → reveal
   const [skipFast, setSkipFast] = useState(false);
   const [drops, setDrops] = useState(null);
@@ -323,7 +325,31 @@ function CaseOpeningModal({ box, count = 1, onDone }) {
   const skipFastRef = useRef(false);
   const landedRef = useRef(new Set());
   const resultsRef = useRef(null);
+  const claimedRef = useRef(false);
   const targetsRef = useRef(Array(count).fill(0));
+
+  // Récupère les gains (une seule fois) puis ferme : les récompenses ne
+  // s'activent qu'ici — une frénésie ne brûle plus pendant l'animation.
+  const claimAndDone = () => {
+    if (!claimedRef.current) {
+      claimedRef.current = true;
+      claimCase(box.id, resultsRef.current || []);
+    }
+    onDone();
+  };
+
+  // Filet de sécurité : toute sortie du modal (dé montage inclus) récupère
+  // les gains — une caisse payée n'est jamais perdue.
+  useEffect(
+    () => () => {
+      if (!claimedRef.current && resultsRef.current?.length) {
+        claimedRef.current = true;
+        claimCase(box.id, resultsRef.current);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   // Les résultats sont tirés à l'ouverture ; les rouleaux sont construits autour
   const strips = useMemo(() => {
@@ -432,7 +458,7 @@ function CaseOpeningModal({ box, count = 1, onDone }) {
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
       if (phase === 'spin') skip();
-      else onDone();
+      else claimAndDone();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -455,7 +481,7 @@ function CaseOpeningModal({ box, count = 1, onDone }) {
     <>
       <div
         className="modal-backdrop"
-        onClick={() => (phase === 'spin' ? skip() : onDone())}
+        onClick={() => (phase === 'spin' ? skip() : claimAndDone())}
       >
         <div
           className="modal-card relative max-w-2xl overflow-hidden"
@@ -467,7 +493,7 @@ function CaseOpeningModal({ box, count = 1, onDone }) {
               Ouverture… ×{count}
             </h3>
             <button
-              onClick={() => (phase === 'spin' ? skip() : onDone())}
+              onClick={() => (phase === 'spin' ? skip() : claimAndDone())}
               className="modal-x"
               aria-label={phase === 'spin' ? "Passer l'animation" : 'Fermer'}
             >
@@ -599,7 +625,7 @@ function CaseOpeningModal({ box, count = 1, onDone }) {
           ) : (
             <div className="modal-foot">
               <button
-                onClick={onDone}
+                onClick={claimAndDone}
                 className="btn btn-primary focus-ring h-11 w-full md:h-10 sm:w-auto"
               >
                 Récupérer
@@ -692,7 +718,8 @@ function CaseOpeningModal({ box, count = 1, onDone }) {
 
 // Panneau des caisses
 export default function CasesPanel() {
-  const endocraft = useGame((s) => s.endocraft);
+  // Solde throttlé : la liste ne se re-rend pas à chaque clic (auto-clicker)
+  const endocraft = useThrottledEndocraft();
   const casesOpened = useGame((s) => s.casesOpened);
   const [opening, setOpening] = useState(null);
   const [contents, setContents] = useState(null);

@@ -1,5 +1,6 @@
 import { COIN_SKINS, TAGS, RARITIES } from '../game/constants';
 import { useGame } from '../game/store';
+import { useThrottledEndocraft } from '../game/hooks';
 import { fmt } from '../game/format';
 import { fx } from '../game/fx';
 
@@ -12,7 +13,8 @@ const replay = (el, cls) => {
 };
 
 export default function CosmeticsPanel() {
-  const endocraft = useGame((s) => s.endocraft);
+  // Solde throttlé : la liste ne se re-rend pas à chaque clic (auto-clicker)
+  const endocraft = useThrottledEndocraft();
   const cosmetics = useGame((s) => s.cosmetics);
   const equippedCoin = useGame((s) => s.equippedCoin);
   const buyCosmetic = useGame((s) => s.buyCosmetic);

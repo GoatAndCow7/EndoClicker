@@ -100,16 +100,41 @@ export default function ClickArea() {
       const gain = getClickPower(s) * boost;
       fx.float(x, y, `+${fmt(gain)}`, 'ec-float-mini');
       fx.burst(x, y, { count: 3, power: 0.6 });
-      const ripple = document.createElement('span');
-      ripple.className = 'ripple ripple-auto';
-      ripple.style.left = '50%';
-      ripple.style.top = '50%';
-      ripple.style.borderColor = fx.theme.ripple;
-      coin.appendChild(ripple);
-      setTimeout(() => ripple.remove(), 650);
+      if (coin.querySelectorAll('.ripple').length < 3) {
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple ripple-auto';
+        ripple.style.left = '50%';
+        ripple.style.top = '50%';
+        ripple.style.borderColor = fx.theme.ripple;
+        coin.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 650);
+      }
     }, Math.round(1000 / autoPerSec));
     return () => clearInterval(t);
   }, [autoPerSec]);
+
+  // Effets d'un clic, bornés pour survivre à un auto-clicker (30+ clics/s) :
+  // l'animation de pression n'est pas rejouée plus vite que sa durée, et
+  // il n'y a jamais plus de 3 ondes de choc simultanées.
+  const pressCoin = () => {
+    const coin = coinRef.current;
+    if (!coin) return;
+    const now = performance.now();
+    if (now - (pressCoin._last || 0) < 120) return;
+    pressCoin._last = now;
+    coin.classList.remove('coin-press');
+    void coin.offsetWidth; // reflow pour rejouer l'animation
+    coin.classList.add('coin-press');
+    if (coin.querySelectorAll('.ripple').length < 3) {
+      const ripple = document.createElement('span');
+      ripple.className = 'ripple';
+      ripple.style.left = '50%';
+      ripple.style.top = '50%';
+      ripple.style.borderColor = fx.theme.ripple; // couleur du skin
+      coin.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
+    }
+  };
 
   const handleClick = (e) => {
     const gain = click();
@@ -129,19 +154,7 @@ export default function ClickArea() {
     );
 
     // Onde de choc sur la pièce
-    const coin = coinRef.current;
-    if (coin) {
-      coin.classList.remove('coin-press');
-      void coin.offsetWidth; // reflow pour rejouer l'animation
-      coin.classList.add('coin-press');
-      const ripple = document.createElement('span');
-      ripple.className = 'ripple';
-      ripple.style.left = '50%';
-      ripple.style.top = '50%';
-      ripple.style.borderColor = fx.theme.ripple; // couleur du skin
-      coin.appendChild(ripple);
-      setTimeout(() => ripple.remove(), 650);
-    }
+    pressCoin();
   };
 
   const boosted = boostEndsAt > Date.now();

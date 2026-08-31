@@ -1,11 +1,13 @@
 import { UPGRADES, STAFF_BY_ID, GENERATOR_BY_ID } from '../game/constants';
 import { useGame } from '../game/store';
+import { useThrottledEndocraft } from '../game/hooks';
 import { fmt } from '../game/format';
 import { fx } from '../game/fx';
 import GameIcon from './GameIcon.jsx';
 
 export default function Upgrades() {
-  const endocraft = useGame((s) => s.endocraft);
+  // Solde throttlé : la liste ne se re-rend pas à chaque clic (auto-clicker)
+  const endocraft = useThrottledEndocraft();
   const generators = useGame((s) => s.generators);
   const staff = useGame((s) => s.staff);
   const ownedUpgrades = useGame((s) => s.upgrades);

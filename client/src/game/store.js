@@ -32,6 +32,8 @@ import { fmt } from './format';
 
 const SAVE_KEY = 'endoclicker_save';
 const SAVE_VERSION = 2; // V2 = reset mondial : les sauvegardes v1 sont ignorées
+// Tirage de caisse payé mais pas encore réclamé (filet anti-crash)
+const PENDING_CASE_KEY = 'endoclicker_pending_case';
 const AUTOSAVE_MS = 5_000;
 const CLOUD_SYNC_MS = 60_000;
 const OFFLINE_CAP_MS = 10 * 3600_000; // 10 h (étendu par Fl0ryoz & co, 18 h max)
@@ -218,6 +220,8 @@ function initialState() {
 // ---------- Store ----------
 
 let toastSeq = 0;
+// Anti-spam de la vérif de succès déclenchée par les clics (auto-clicker)
+let lastClickAchievementCheck = 0;
 
 // ---------- Quêtes quotidiennes : utilitaires ----------
 
@@ -387,7 +391,6 @@ export const useGame = create((set, get) => ({
       lifetimeEndocraft: s.lifetimeEndocraft + gain,
       clicks: s.clicks + 1,
     });
-
     // Tempête de clics active : chaque clic lâche des mini-pommes,
     // dans la limite du plafond de la tempête.
     if (s.shadowStorm && s.shadowStorm.endsAt > Date.now()) {
@@ -419,7 +422,14 @@ export const useGame = create((set, get) => ({
       }
     }
 
-    get().checkAchievements();
+    // Vérif des succès throttlée : à 30+ clics/s (auto-clicker), passer
+    // les 55 checks sur CHAQUE clic plombe le thread — la boucle de jeu
+    // re-vérifie de toute façon chaque seconde.
+    const nowMs = Date.now();
+    if (nowMs - lastClickAchievementCheck >= 400) {
+      lastClickAchievementCheck = nowMs;
+      get().checkAchievements();
+    }
     return gain;
   },
 
@@ -553,9 +563,11 @@ export const useGame = create((set, get) => ({
   },
 
   // ---------- Cases (ouverture à la CS:GO) ----------
-  // Tire un drop, l'applique immédiatement et le retourne pour l'animation.
-  // Un doublon d'upgrade/skin/tag exclusif est remboursé en cash
-  // (15-25 % du prix de la caisse selon la rareté).
+  // Tire un drop SANS l'appliquer : la caisse est payée et le résultat
+  // scellé, mais les récompenses ne s'activent qu'au moment de RÉCUPÉRER —
+  // sinon une frénésie brûle pendant l'animation du rouleau. Les doublons
+  // sont annotés dès le tirage (l'inventaire ne peut pas changer pendant
+  // que le rouleau tourne) pour l'affichage, et remboursés au claim.
   openCase(caseId) {
     const s = get();
     const box = CASES.find((c) => c.id === caseId);
@@ -573,73 +585,114 @@ export const useGame = create((set, get) => ({
       }
     }
 
-    const patch = {
+    // Annotation des doublons (pour l'affichage du rouleau/révélation)
+    if (drop.type === 'upgrade' && s.upgrades.includes(drop.upgradeId)) {
+      drop = { ...drop, duplicate: true, duplicateCash: Math.max(1000, Math.round(box.cost * (CASE_DUPLICATE_REFUND[drop.rarity] ?? 0.2))) };
+    } else if (drop.type === 'skin' && s.cosmetics.includes(drop.skinId)) {
+      drop = { ...drop, duplicate: true, duplicateCash: Math.max(1000, Math.round(box.cost * (CASE_DUPLICATE_REFUND[drop.rarity] ?? 0.2))) };
+    } else if (drop.type === 'tag' && (s.tags || []).includes(drop.tagId)) {
+      drop = { ...drop, duplicate: true, duplicateCash: Math.max(1000, Math.round(box.cost * (CASE_DUPLICATE_REFUND[drop.rarity] ?? 0.2))) };
+    }
+
+    set({
       endocraft: s.endocraft - box.cost,
       casesOpened: s.casesOpened + 1,
-    };
+    });
+    // Filet anti-crash : le tirage est persisté tel quel avec le paiement.
+    // Si l'onglet meurt avant le « Récupérer », le prochain démarrage
+    // réclamera les gains automatiquement.
+    try {
+      localStorage.setItem(PENDING_CASE_KEY, JSON.stringify({ caseId, drop }));
+    } catch {
+      /* quota : tant pis pour le filet */
+    }
+    get().saveLocal();
+    return drop;
+  },
+
+  // Applique les drops tirés — appelé par le bouton « Récupérer » ET par
+  // tous les chemins de sortie du rouleau (Échap, fond, fermeture), pour
+  // qu'une caisse payée ne soit jamais perdue.
+  claimCase(caseId, drops) {
+    const s = get();
+    const box = CASES.find((c) => c.id === caseId);
+    if (!box || !Array.isArray(drops) || drops.length === 0) return [];
+
+    const patch = {};
     const credit = (amount) => {
-      patch.endocraft += amount;
+      patch.endocraft = (patch.endocraft ?? s.endocraft) + amount;
       patch.totalEndocraft = (patch.totalEndocraft ?? s.totalEndocraft) + amount;
       patch.lifetimeEndocraft =
         (patch.lifetimeEndocraft ?? s.lifetimeEndocraft) + amount;
     };
-    // Remboursement d'un doublon (upgrade/skin/tag déjà possédé)
     const refundDuplicate = (d) => {
-      const refund = Math.max(
-        1000,
-        Math.round(box.cost * (CASE_DUPLICATE_REFUND[d.rarity] ?? 0.2))
+      credit(
+        d.duplicateCash ??
+          Math.max(1000, Math.round(box.cost * (CASE_DUPLICATE_REFUND[d.rarity] ?? 0.2)))
       );
-      credit(refund);
-      return { ...d, duplicate: true, duplicateCash: refund };
+      return { ...d, duplicate: true };
     };
+    let wantRain = false;
 
-    // Application du prix
-    if (drop.type === 'cash') {
-      credit(Math.max(1000, box.cost * drop.percent));
-    } else if (drop.type === 'nothing') {
-      // Rien du tout — le vrai rembobinage
-    } else if (drop.type === 'bank') {
-      // Bonus immédiat : % de la banque, plafonné à 3× le prix de la caisse
-      // (sinon les grosses banques rendent les cases gratuites)
-      credit(Math.max(50, Math.min(s.endocraft * drop.bankPercent, box.cost * 3)));
-    } else if (drop.type === 'frenzy') {
-      get().applyBoost(7, drop.durationMs);
-    } else if (drop.type === 'rain') {
-      get().startAppleRain();
-    } else if (drop.type === 'upgrade') {
-      if (s.upgrades.includes(drop.upgradeId)) {
-        drop = refundDuplicate(drop);
-      } else {
-        patch.upgrades = [...s.upgrades, drop.upgradeId];
-        if (drop.rarity === 'legendaire') {
-          patch.caseLegendaryDrops = s.caseLegendaryDrops + 1;
+    const claimed = drops.filter(Boolean).map((drop) => {
+      if (drop.type === 'cash') {
+        credit(Math.max(1000, box.cost * drop.percent));
+      } else if (drop.type === 'nothing') {
+        // Plus présent dans les tables V2 — gardé par sécurité
+      } else if (drop.type === 'bank') {
+        // % de la banque au moment du claim, plafonné à 3× le prix
+        credit(Math.max(50, Math.min(s.endocraft * drop.bankPercent, box.cost * 3)));
+      } else if (drop.type === 'frenzy') {
+        // appliqué après le set(patch) ci-dessous
+        get().applyBoost(7, drop.durationMs);
+      } else if (drop.type === 'rain') {
+        wantRain = true;
+      } else if (drop.type === 'upgrade') {
+        if (drop.duplicate || s.upgrades.includes(drop.upgradeId)) {
+          drop = refundDuplicate(drop);
+        } else {
+          patch.upgrades = [...s.upgrades, drop.upgradeId];
+          if (drop.rarity === 'legendaire') {
+            patch.caseLegendaryDrops =
+              (patch.caseLegendaryDrops ?? s.caseLegendaryDrops) + 1;
+          }
+        }
+      } else if (drop.type === 'skin') {
+        if (drop.duplicate || s.cosmetics.includes(drop.skinId)) {
+          drop = refundDuplicate(drop);
+        } else {
+          patch.cosmetics = [...s.cosmetics, drop.skinId];
+          if (drop.rarity === 'legendaire') {
+            patch.caseLegendaryDrops =
+              (patch.caseLegendaryDrops ?? s.caseLegendaryDrops) + 1;
+          }
+        }
+      } else if (drop.type === 'tag') {
+        if (drop.duplicate || (s.tags || []).includes(drop.tagId)) {
+          drop = refundDuplicate(drop);
+        } else {
+          patch.tags = [...(s.tags || []), drop.tagId];
+          patch.equippedTag = drop.tagId; // équipé immédiatement
+          if (drop.rarity === 'legendaire') {
+            patch.caseLegendaryDrops =
+              (patch.caseLegendaryDrops ?? s.caseLegendaryDrops) + 1;
+          }
         }
       }
-    } else if (drop.type === 'skin') {
-      if (s.cosmetics.includes(drop.skinId)) {
-        drop = refundDuplicate(drop);
-      } else {
-        patch.cosmetics = [...s.cosmetics, drop.skinId];
-        if (drop.rarity === 'legendaire') {
-          patch.caseLegendaryDrops = s.caseLegendaryDrops + 1;
-        }
-      }
-    } else if (drop.type === 'tag') {
-      if ((s.tags || []).includes(drop.tagId)) {
-        drop = refundDuplicate(drop);
-      } else {
-        patch.tags = [...(s.tags || []), drop.tagId];
-        patch.equippedTag = drop.tagId; // équipé immédiatement
-        if (drop.rarity === 'legendaire') {
-          patch.caseLegendaryDrops = s.caseLegendaryDrops + 1;
-        }
-      }
+      return drop;
+    });
+
+    if (Object.keys(patch).length > 0) set(patch);
+    if (wantRain) get().startAppleRain();
+    try {
+      localStorage.removeItem(PENDING_CASE_KEY);
+    } catch {
+      /* rien */
     }
-
-    set(patch);
+    get().saveLocal();
     playPurchase();
     get().checkAchievements();
-    return drop;
+    return claimed;
   },
 
   equipTag(id) {
@@ -1276,6 +1329,26 @@ export const useGame = create((set, get) => ({
       // Première partie (ou reset mondial V2 : l'ancienne save est ignorée)
       set({ quests: generateDailyQuests(get()) });
     }
+
+    // Une caisse payée mais jamais réclamée (onglet fermé pendant le
+    // rouleau) : les gains sont rendus au démarrage.
+    try {
+      const raw = localStorage.getItem(PENDING_CASE_KEY);
+      if (raw) {
+        const pending = JSON.parse(raw);
+        localStorage.removeItem(PENDING_CASE_KEY);
+        if (pending?.caseId && pending?.drop) {
+          get().claimCase(pending.caseId, [pending.drop]);
+          get().addToast(
+            '🎁',
+            'Gains récupérés',
+            'Une caisse restée ouverte a été encaissée automatiquement.'
+          );
+        }
+      }
+    } catch {
+      /* tirage illisible : on ne crashe pas au démarrage */
+    }
   },
 
   // Déconnexion : la progression du compte ne doit pas fuiter vers le
@@ -1283,6 +1356,7 @@ export const useGame = create((set, get) => ({
   resetForLogout() {
     try {
       localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(PENDING_CASE_KEY);
     } catch {
       /* rien */
     }

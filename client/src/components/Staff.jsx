@@ -1,5 +1,6 @@
 import { STAFF } from '../game/constants';
 import { useGame } from '../game/store';
+import { useThrottledEndocraft } from '../game/hooks';
 import { fmt } from '../game/format';
 import { fx } from '../game/fx';
 
@@ -12,7 +13,8 @@ const replay = (el, cls) => {
 };
 
 export default function Staff() {
-  const endocraft = useGame((s) => s.endocraft);
+  // Solde throttlé : la liste ne se re-rend pas à chaque clic (auto-clicker)
+  const endocraft = useThrottledEndocraft();
   const staff = useGame((s) => s.staff);
   const buyStaff = useGame((s) => s.buyStaff);
 

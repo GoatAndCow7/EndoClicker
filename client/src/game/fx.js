@@ -90,9 +90,14 @@ class FX {
     });
   }
 
-  // Éclat d'étincelles (clic sur l'EndoCraft)
+  // Éclat d'étincelles (clic sur l'EndoCraft). Anti-spam : avec un
+  // auto-clicker à 30+ clics/s, générer 14 particules par clic sature
+  // le cap et fait thrasher le moteur — on borne la fréquence.
   burst(x, y, { count = 14, power = 1 } = {}) {
     if (REDUCED || document.hidden) return; // zéro coût si décoration coupée
+    const now = performance.now();
+    if (now - this._lastBurst < 33) return; // max ~30 éclats/s
+    this._lastBurst = now;
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) break;
       const angle = Math.random() * Math.PI * 2;
@@ -142,9 +147,12 @@ class FX {
     this.burst(x, y, { count: 8, power: 0.6 });
   }
 
-  // Nombre flottant "+X" (couleur du thème du skin équipé)
+  // Nombre flottant "+X" (couleur du thème du skin équipé). Plafonné :
+  // un auto-clicker à 30+ clics/s créerait autant de nœuds DOM par
+  // seconde — au-delà de 8 affichés, on laisse tomber les suivants.
   float(x, y, text, cls = '') {
     if (document.hidden || !this.layer) return;
+    if (this.layer.childElementCount >= 8) return;
     const el = document.createElement('span');
     el.textContent = text;
     el.className = `float-number ${cls}`;
